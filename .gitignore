@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+cadoces.db
+utilizadores.xlsx
+*.xlsx
+*.db
+static/uploads/portfolio/*

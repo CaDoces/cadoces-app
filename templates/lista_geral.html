@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="/" class="btn btn-outline-secondary mb-3 btn-sm">← Voltar ao Menu</a>
+<h2 style="font-family: serif; font-weight: bold;">Lista Geral de Ingredientes</h2>
+<p class="text-muted">Controlo de compras, preços unitários e alertas de stock.</p>
+
+<div class="card shadow-sm mb-4 p-4 border-0" style="background-color: #fff; border-left: 4px solid var(--cadoces-pink) !important;">
+    <h5 class="mb-3" style="font-weight: 600;">Adicionar Novo Ingrediente</h5>
+    <form action="/lista-geral/adicionar" method="POST" class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Nome do Ingrediente</label>
+            <input type="text" class="form-control" name="nome" placeholder="Ex: Farinha T55" required>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Unidade</label>
+            <select class="form-select" name="unidade">
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+                <option value="ml">ml</option>
+                <option value="l">l</option>
+                <option value="un">un</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Preço Pago (€)</label>
+            <input type="number" step="0.01" class="form-control" name="preco_pago" value="0.00">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Qtd. Comprada</label>
+            <input type="number" step="0.01" class="form-control" name="qtd_comprada" value="1.00">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Stock Atual</label>
+            <input type="number" step="0.01" class="form-control" name="stock_atual" value="0.00">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Stock Mínimo</label>
+            <input type="number" step="0.01" class="form-control" name="stock_minimo" value="0.00">
+        </div>
+        <div class="col-12 mt-4">
+            <button type="submit" class="btn btn-cadoces px-4">Guardar Ingrediente</button>
+        </div>
+    </form>
+</div>
+
+<div class="card shadow-sm p-4 border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Unidade</th>
+                    <th>Compra</th>
+                    <th>Custo/Un.</th>
+                    <th>Stock Atual</th>
+                    <th>Stock Mínimo</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in itens %}
+                <tr>
+                    <td class="fw-bold">{{ item.Nome }}</td>
+                    <td>{{ item.Unidade }}</td>
+                    <td>{{ item.Compra }}</td>
+                    <td>€{{ "%.4f"|format(item['Custo/Un.']) }}</td>
+                    <td>
+                        {% if item['Stock Atual'] <= item['Stock Mínimo'] %}
+                            <span class="badge badge-pink">{{ item['Stock Atual'] }} (Baixo)</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ item['Stock Atual'] }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item['Stock Mínimo'] }}</td>
+                    <td>
+                        <form action="/lista-geral/apagar/{{ loop.index0 }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Tem a certeza?')">Apagar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">Ainda não existem ingredientes registados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

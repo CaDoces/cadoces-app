@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-4">
+    <h1 style="font-family: serif; font-weight: bold;">Painel de Controlo</h1>
+    <p class="text-muted">Selecione o módulo que pretende gerir.</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <a href="/lista-geral" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">📦</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Lista Geral</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Ingredientes, materiais e stock</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/receitas" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">🍴</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Receitas</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Criar e gerir receitas</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/despesas" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">📋</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Despesas</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Despesas operacionais</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/encomendas" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">📄</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Orçamentos / Encomendas</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Orçamentos e encomendas</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/clientes" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">📇</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Clientes</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Gestão de clientes</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/compras" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">🛒</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Lista de Compras</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Gerir lista de compras</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/maodeobra" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">⏱️</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Mão de Obra</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Tarefas e custos de trabalho</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/financeira" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">📊</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Análise Financeira</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Análise de custos e lucros</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/portfolio" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">🖼️</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Portefólio</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Galeria de trabalhos e bolos</div>
+        </a>
+    </div>
+
+    <div class="col-md-4">
+        <a href="/suporte" class="menu-card w-100" style="text-decoration: none; color: inherit; display: block; background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div class="menu-icon" style="font-size: 28px; margin-bottom: 12px;">🎧</div>
+            <div class="menu-title" style="font-weight: bold; font-size: 18px; color: #8c4410; margin-bottom: 6px;">Suporte</div>
+            <div class="menu-desc" style="color: #666; font-size: 14px;">Reportar um problema</div>
+        </a>
+    </div>
+</div>
+{% endblock %}

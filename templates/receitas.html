@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>CáDoces - Gestão de Receitas</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #FAF8F5; color: #4A3B32; margin: 0; padding: 30px; }
+        .container { max-width: 1100px; margin: auto; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; padding: 20px 25px; border: 1px solid #EEDCCE; border-radius: 14px; box-shadow: 0 2px 6px rgba(74,59,50,0.02); flex-wrap: wrap; gap: 15px; }
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .back-btn { text-decoration: none; color: #4A3B32; font-size: 18px; font-weight: bold; background: #F5EBE0; padding: 10px 16px; border-radius: 10px; border: 1px solid #EEDCCE; transition: background 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+        .back-btn:hover { background: #EEDCCE; }
+        h1 { margin: 0; color: #2C1E1A; font-size: 24px; font-weight: 700; }
+        p.sub { margin: 4px 0 0 0; color: #8C7A6B; font-size: 14px; }
+        .top-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn-outline { background: #F5EBE0; border: 1px solid #EEDCCE; color: #4A3B32; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; text-decoration: none; font-size: 14px; transition: all 0.2s; }
+        .btn-outline:hover { background: #EEDCCE; }
+        .btn-primary { background: #D99B6A; color: #FFFFFF; border: none; padding: 11px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; transition: background 0.2s; box-shadow: 0 2px 4px rgba(217,155,106,0.2); }
+        .btn-primary:hover { background: #C48757; }
+        .content-box { background: #FFFFFF; border: 1px solid #EEDCCE; border-radius: 14px; padding: 25px; box-shadow: 0 2px 6px rgba(74,59,50,0.02); margin-top: 25px; }
+        table.table-custom { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        table.table-custom th { background-color: #FBF7F2; color: #734D2E; padding: 14px 16px; text-align: left; border-bottom: 2px solid #EEDCCE; font-size: 14px; font-weight: 600; }
+        table.table-custom td { padding: 14px 16px; border-bottom: 1px solid #F5EBE0; color: #4A3B32; font-size: 14px; }
+        table.table-custom tr:hover td { background-color: #FAF8F5; }
+        
+        .form-section { display: none; background: #FFFFFF; border: 1px solid #EEDCCE; border-radius: 14px; padding: 25px; margin-top: 25px; box-shadow: 0 2px 6px rgba(74,59,50,0.02); }
+        .form-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; margin-bottom: 6px; color: #734D2E; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #EEDCCE; border-radius: 8px; box-sizing: border-box; background: #FFFFFF; color: #4A3B32; font-size: 14px; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #D99B6A; }
+        
+        .ingrediente-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .custo-estimado { background: #F5EBE0; padding: 15px; border-radius: 10px; font-weight: bold; color: #734D2E; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .btn-remove { background: #C0392B; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-remove:hover { background: #A93226; }
+    </style>
+</head>
+<body>
+
+<!-- Elemento oculto seguro para transportar os custos sem quebrar o JS -->
+<div id="dados-seguros" data-custos='{{ custos_js|safe }}' style="display:none;"></div>
+
+<div class="container">
+    <div class="header-bar">
+        <div class="header-left">
+            <a href="/" class="back-btn">&#8592;</a>
+            <div>
+                <h1>Livro de Receitas</h1>
+                <p class="sub">Gestão de receitas, fichas técnicas e cálculo automático de custos</p>
+            </div>
+        </div>
+        <div class="top-actions">
+            <a href="/" class="btn-outline">🏠 Menu</a>
+            <button type="button" id="btnNovaReceita" class="btn-primary">+ Nova Receita</button>
+        </div>
+    </div>
+
+    <!-- Formulário para Adicionar Receita -->
+    <div id="formAdicionarReceita" class="form-section">
+        <h2>Adicionar Nova Receita</h2>
+        <p class="sub" style="margin-bottom: 20px;">Preencha os detalhes e adicione os ingredientes necessários</p>
+        
+        <form action="{{ url_for('receitas_bp.adicionar_receita') }}" method="POST">
+            <div class="form-grid" style="grid-template-columns: 2fr 1fr 1fr;">
+                <div class="form-group">
+                    <label>Nome da Receita</label>
+                    <input type="text" name="nome" placeholder="Ex: Bolo de Maçã com Canela" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <input type="text" name="categoria" placeholder="Ex: Bolos de Outono">
+                </div>
+                <div class="form-group">
+                    <label>Tempo de Preparação (min)</label>
+                    <input type="number" name="tempo" placeholder="45">
+                </div>
+            </div>
+
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Descrição Curta</label>
+                    <input type="text" name="descricao" placeholder="Ex: Bolo húmido com cobertura de creme de canela e crumble.">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label style="font-size: 14px; margin-bottom: 10px; color: #2C1E1A; font-weight: 700;">Ingredientes da Receita</label>
+                <div id="lista-ingredientes-container">
+                    <div class="ingrediente-row">
+                        <select name="ingrediente[]" class="select-ingrediente" required>
+                            <option value="" disabled selected>Selecione o ingrediente...</option>
+                            {{ opcoes_ingredientes|safe }}
+                        </select>
+                        <input type="number" step="any" name="quantidade[]" class="input-qtd" placeholder="Qtd" required>
+                        <button type="button" class="btn-remove" style="display: none;">✕</button>
+                    </div>
+                </div>
+                <button type="button" id="btnAddIngrediente" class="btn-outline" style="margin-top: 10px;">+ Adicionar Ingrediente</button>
+            </div>
+
+            <div class="custo-estimado">
+                <span>Custo Total Estimado dos Ingredientes:</span>
+                <span id="custoTotalPreview" style="font-size: 18px; color: #D99B6A;">€0.00</span>
+            </div>
+
+            <div class="form-group">
+                <label>Modo de Preparação</label>
+                <textarea name="preparacao" rows="4" placeholder="Descreva os passos da receita..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Notas / Dicas</label>
+                <textarea name="notas" rows="2" placeholder="Notas adicionais..."></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" id="btnCancelar" class="btn-outline">Cancelar</button>
+                <button type="submit" class="btn-primary">Guardar Receita</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabela de Listagem de Receitas -->
+    <div class="content-box">
+        <table class="table-custom">
+            <thead>
+                <tr>
+                    <th style="width: 30px;"><input type="checkbox" id="selectAll" style="display:none;"></th>
+                    <th>Nome</th>
+                    <th>Categoria</th>
+                    <th>Descrição</th>
+                    <th>Tempo</th>
+                    <th>Custo Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ linhas_tabela|safe }}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Leitura segura dos custos via atributo data (evita crash de sintaxe)
+    let custosIngredientes = {};
+    try {
+        const dadosDiv = document.getElementById('dados-seguros');
+        if (dadosDiv && dadosDiv.dataset.custos) {
+            custosIngredientes = JSON.parse(dadosDiv.dataset.custos);
+        }
+    } catch (e) {
+        console.error("Aviso ao carregar custos:", e);
+    }
+
+    // Função para abrir/fechar o formulário
+    function toggleFormulario() {
+        let formSec = document.getElementById('formAdicionarReceita');
+        if (formSec.style.display === 'none' || formSec.style.display === '') {
+            formSec.style.display = 'block';
+            formSec.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            formSec.style.display = 'none';
+        }
+    }
+
+    // Associar eventos por JavaScript puro para garantir que nunca falham
+    document.getElementById('btnNovaReceita').addEventListener('click', toggleFormulario);
+    document.getElementById('btnCancelar').addEventListener('click', toggleFormulario);
+
+    document.getElementById('btnAddIngrediente').addEventListener('click', function() {
+        let container = document.getElementById('lista-ingredientes-container');
+        let primeiraLinha = container.querySelector('.ingrediente-row');
+        let novaLinha = primeiraLinha.cloneNode(true);
+        
+        novaLinha.querySelector('select').value = "";
+        novaLinha.querySelector('input').value = "";
+        novaLinha.querySelector('.btn-remove').style.display = 'inline-block';
+        
+        // Atribuir eventos aos novos elementos
+        novaLinha.querySelector('select').addEventListener('change', calcularCustoTotal);
+        novaLinha.querySelector('input').addEventListener('input', calcularCustoTotal);
+        novaLinha.querySelector('.btn-remove').addEventListener('click', function() {
+            if (document.querySelectorAll('.ingrediente-row').length > 1) {
+                novaLinha.remove();
+                calcularCustoTotal();
+            }
+        });
+        
+        container.appendChild(novaLinha);
+        calcularCustoTotal();
+    });
+
+    // Atribuir eventos à primeira linha inicial
+    document.querySelectorAll('.ingrediente-row').forEach(row => {
+        row.querySelector('.select-ingrediente').addEventListener('change', calcularCustoTotal);
+        row.querySelector('.input-qtd').addEventListener('input', calcularCustoTotal);
+    });
+
+    function calcularCustoTotal() {
+        let total = 0;
+        let rows = document.querySelectorAll('.ingrediente-row');
+        rows.forEach(row => {
+            let select = row.querySelector('select');
+            let inputQtd = row.querySelector('input');
+            let nomeIng = select.value;
+            let qtd = parseFloat(inputQtd.value) || 0;
+
+            if (nomeIng && custosIngredientes[nomeIng] !== undefined) {
+                total += custosIngredientes[nomeIng] * qtd;
+            }
+        });
+        document.getElementById('custoTotalPreview').textContent = '€' + total.toFixed(2);
+    }
+</script>
+</body>
+</html>
