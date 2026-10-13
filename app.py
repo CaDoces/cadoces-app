@@ -3,10 +3,6 @@ import datetime
 import random
 import string
 import re
-import smtplib
-import threading
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 import pandas as pd
 import sqlite3
@@ -45,6 +41,17 @@ def inicializar_tabela_utilizadores():
         )
     ''')
     
+    # Criar tabela de pedidos internos de recuperação de password, caso não exista
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pedidos_recuperacao (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            pass_temporaria TEXT NOT NULL,
+            data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            estado TEXT DEFAULT 'Pendente'
+        )
+    ''')
+    
     # Criar a conta de administração padrão caso a tabela esteja vazia
     cursor.execute('SELECT COUNT(*) FROM utilizadores WHERE email = ?', ('cadoces023@gmail.com',))
     if cursor.fetchone()[0] == 0:
@@ -56,7 +63,7 @@ def inicializar_tabela_utilizadores():
     conn.commit()
     conn.close()
 
-# Executar a criação da tabela no arranque da aplicação
+# Executar a criação das tabelas no arranque da aplicação
 inicializar_tabela_utilizadores()
 
 def obter_utilizador_por_email(email):
@@ -107,54 +114,6 @@ def validar_password_forte(password):
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
         return "A palavra-passe deve conter pelo menos um caractere especial (ex: !@#$%^&*)."
     return None
-
-def enviar_email_recuperacao_async(email_destino, nova_pass_temp):
-    def enviar():
-        remetente_email = os.environ.get('MAIL_USERNAME', 'cadoces023@gmail.com').strip()
-        remetente_password = os.environ.get('MAIL_PASSWORD', '').replace(' ', '').strip()
-
-        if not remetente_password:
-            print("⚠️ AVISO: MAIL_PASSWORD não configurada no ambiente.")
-            return
-
-        assunto = "🔑 CáDoces - Recuperação de Palavra-passe"
-        corpo_html = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; color: #333; background-color: #fdfbf7; padding: 20px;">
-            <div style="max-width: 500px; margin: auto; background: #fffdf9; border: 2px solid #f3e5d0; padding: 25px; border-radius: 12px;">
-                <h2 style="color: #4A3B32; text-align: center;">CáDoces 🧁</h2>
-                <p>Olá,</p>
-                <p>Recebemos um pedido para repor a palavra-passe da tua conta associada a este email.</p>
-                <div style="background: #f9f0e6; border: 1px dashed #dfa673; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
-                    <span style="font-size: 13px; color: #666;">A tua palavra-passe temporária é:</span><br>
-                    <strong style="font-size: 20px; color: #b85d19; letter-spacing: 1px;">{nova_pass_temp}</strong>
-                </div>
-                <p>Utiliza esta palavra-passe temporária para entrar em <a href="https://cadoces-app.onrender.com/login" style="color: #b85d19; font-weight: bold;">https://cadoces-app.onrender.com</a>.</p>
-                <p><strong>Importante:</strong> Assim que entrares no sistema, vai ao menu <em>"Alterar Palavra-passe"</em> para definir a tua palavra-passe pessoal e segura.</p>
-                <br>
-                <p style="font-size: 12px; color: #888; text-align: center;">Se não solicitaste esta alteração, ignora este email.</p>
-            </div>
-        </body>
-        </html>
-        """
-
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = assunto
-        msg['From'] = f"CáDoces <{remetente_email}>"
-        msg['To'] = email_destino
-        msg.attach(MIMEText(corpo_html, 'html'))
-
-        try:
-            print(f"📧 A ligar ao SMTP do Gmail para enviar para {email_destino}...")
-            with smtplib.SMTP('smtp.gmail.com', 587, timeout=15) as server:
-                server.starttls()
-                server.login(remetente_email, remetente_password)
-                server.sendmail(remetente_email, email_destino, msg.as_string())
-            print(f"✅ EMAIL ENVIADO COM SUCESSO PARA {email_destino}")
-        except Exception as e:
-            print(f"❌ ERRO SMTP AO ENVIAR EMAIL: {str(e)}")
-
-    threading.Thread(target=enviar).start()
 
 # Registo de todos os Blueprints
 app.register_blueprint(receitas_bp)
@@ -271,10 +230,17 @@ def recuperar_password():
             nova_pass_temp = gerar_password_aleatoria()
             atualizar_password_bd(email, generate_password_hash(nova_pass_temp))
             
-            # Envio em segundo plano assíncrono (não bloqueia a página)
-            enviar_email_recuperacao_async(email, nova_pass_temp)
+            # Registar o pedido de recuperação internamente para a administração verificar
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO pedidos_recuperacao (email, pass_temporaria)
+                VALUES (?, ?)
+            ''', (email, nova_pass_temp))
+            conn.commit()
+            conn.close()
             
-            mensagem = f"Enviámos um email para <strong>{email}</strong> com a tua palavra-passe temporária. Por favor, verifica a tua caixa de entrada (ou pasta de Spam)."
+            mensagem = f"O pedido de reposição para <strong>{email}</strong> foi enviado com sucesso para a administração da CáDoces. O administrador irá verificar o seu pedido e fornecer-lhe a nova palavra-passe temporária."
         else:
             erro = "Email não encontrado na base de dados de utilizadores."
 
@@ -304,7 +270,7 @@ def recuperar_password():
     <body>
         <div class="card-box">
             <h2>Repor Palavra-passe 🔑</h2>
-            <p class="sub">Introduza o email associado à sua conta para receber uma palavra-passe temporária por email.</p>
+            <p class="sub">Introduza o email associado à sua conta para submeter um pedido de recuperação interno à administração.</p>
             
             {% if mensagem %}
                 <div class="msg">{{ mensagem | safe }}</div>
@@ -319,7 +285,7 @@ def recuperar_password():
                     <label>Email de Acesso</label>
                     <input type="email" name="email" required placeholder="cadoces023@gmail.com">
                 </div>
-                <button type="submit" class="btn">Enviar Palavra-passe por Email</button>
+                <button type="submit" class="btn">Submeter Pedido à Administração</button>
             </form>
             
             <a href="/login" class="back-link">← Voltar ao Login</a>
@@ -327,6 +293,87 @@ def recuperar_password():
     </body>
     </html>
     """, mensagem=mensagem, erro=erro)
+
+@app.route("/admin/pedidos_recuperacao")
+def listar_pedidos_recuperacao():
+    if session.get('user_type') != 'admin':
+        return "Acesso não autorizado.", 403
+        
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM pedidos_recuperacao ORDER BY data_pedido DESC')
+    pedidos = cursor.fetchall()
+    conn.close()
+    
+    linhas = ""
+    for p in pedidos:
+        linhas += f"""
+        <tr>
+            <td>{p['id']}</td>
+            <td><strong>{p['email']}</strong></td>
+            <td><code style="background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;">{p['pass_temporaria']}</code></td>
+            <td>{p['data_pedido']}</td>
+            <td><a href="/admin/pedidos_recuperacao/apagar/{p['id']}" style="color: #c62828; text-decoration: none; font-weight: bold;">🗑️ Marcar como Resolvido</a></td>
+        </tr>
+        """
+        
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CáDoces - Pedidos de Recuperação</title>
+        <style>
+            body { font-family: Arial, sans-serif; background-color: #fdfbf7; margin: 0; padding: 30px; color: #333; box-sizing: border-box; }
+            .container { max-width: 900px; margin: auto; }
+            .card-box { background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+            h2 { margin-top: 0; color: #111; font-size: 20px; margin-bottom: 10px; }
+            p { font-size: 13px; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th { background: #f9f0e6; color: #4A3B32; font-size: 12px; font-weight: bold; padding: 12px 10px; text-align: left; border-bottom: 2px solid #f3e5d0; text-transform: uppercase; }
+            td { padding: 12px 10px; border-bottom: 1px solid #f3e5d0; color: #444; font-size: 14px; }
+            .back-link { display: inline-block; margin-bottom: 15px; color: #b85d19; text-decoration: none; font-weight: bold; font-size: 14px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <a href="/" class="back-link">← Voltar ao Painel Principal</a>
+            <div class="card-box">
+                <h2>🔑 Pedidos Internos de Recuperação de Palavra-passe</h2>
+                <p>Aqui podes consultar as palavras-passe temporárias geradas para os utilizadores que solicitaram recuperação no ecrã de login.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Email do Utilizador</th>
+                            <th>Palavra-passe Temporária Gerada</th>
+                            <th>Data do Pedido</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ linhas | safe }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>
+    """, linhas=linhas)
+
+@app.route("/admin/pedidos_recuperacao/apagar/<int:pid>")
+def apagar_pedido_recuperacao(pid):
+    if session.get('user_type') != 'admin':
+        return "Acesso não autorizado.", 403
+        
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM pedidos_recuperacao WHERE id = ?', (pid,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('listar_pedidos_recuperacao'))
 
 @app.route("/alterar_password", methods=["GET", "POST"])
 def alterar_password():
@@ -480,9 +527,7 @@ def gerir_alunos():
             conn.commit()
             conn.close()
             
-            # Enviar email ao aluno em segundo plano
-            enviar_email_recuperacao_async(email, password_temporaria)
-            mensagem = f"✅ Aluno registado com sucesso! Foi enviada uma palavra-passe temporária para <strong>{email}</strong> (temporária: <strong>{password_temporaria}</strong>)."
+            mensagem = f"✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong>"
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -562,6 +607,7 @@ def gerir_alunos():
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                 <h1>Gestão de Alunos e Acessos</h1>
                 <div>
+                    <a href="/admin/pedidos_recuperacao" style="background: #f9f0e6; color: #b85d19; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; margin-right: 15px;">🔔 Pedidos de Recuperação</a>
                     <a href="/alterar_password" style="color: #b85d19; text-decoration: none; font-weight: bold; font-size: 14px; margin-right: 15px;">🔑 Alterar Palavra-passe</a>
                     <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; font-size: 14px;">Terminar Sessão 🚪</a>
                 </div>
@@ -571,7 +617,7 @@ def gerir_alunos():
 
             <div class="card-box">
                 <div class="card-title">Adicionar Novo Aluno</div>
-                <p style="font-size: 13px; color: #666; margin-top: -10px; margin-bottom: 15px;">Ao registar um novo aluno, será gerada automaticamente uma <strong>palavra-passe temporária única</strong> e enviada para o seu email.</p>
+                <p style="font-size: 13px; color: #666; margin-top: -10px; margin-bottom: 15px;">Ao registar um novo aluno, será gerada automaticamente uma <strong>palavra-passe temporária única</strong>.</p>
                 <form method="POST">
                     <div class="form-grid">
                         <div class="form-group">
