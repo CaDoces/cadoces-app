@@ -3,6 +3,10 @@ import datetime
 import random
 import string
 import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 import pandas as pd
 import sqlite3
 from flask import Flask, render_template_string, session, redirect, url_for, request
@@ -24,7 +28,51 @@ from database import inicializar_bd_aluno
 app = Flask(__name__)
 app.secret_key = 'cadoces_segredo_super_importante'
 
-EXCEL_UTILIZADORES = 'utilizadores.xlsx'
+DB_PATH = 'cadoces.db'
+
+def inicializar_tabela_utilizadores():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS utilizadores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            tipo TEXT NOT NULL,
+            telemovel TEXT
+        )
+    ''')
+    
+    # Criar a conta de administração padrão caso a tabela esteja vazia
+    cursor.execute('SELECT COUNT(*) FROM utilizadores WHERE email = ?', ('cadoces023@gmail.com',))
+    if cursor.fetchone()[0] == 0:
+        cursor.execute('''
+            INSERT INTO utilizadores (nome, email, password, tipo, telemovel)
+            VALUES (?, ?, ?, ?, ?)
+        ''', ('Cátia Cardoso', 'cadoces023@gmail.com', generate_password_hash('1234'), 'admin', '351910313162'))
+    
+    conn.commit()
+    conn.close()
+
+# Executar a criação da tabela no arranque da aplicação
+inicializar_tabela_utilizadores()
+
+def obter_utilizador_por_email(email):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM utilizadores WHERE email = ?', (email,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+def atualizar_password_bd(email, nova_password_hash):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('UPDATE utilizadores SET password = ? WHERE email = ?', (nova_password_hash, email))
+    conn.commit()
+    conn.close()
 
 def gerar_password_aleatoria():
     minusculas = string.ascii_lowercase
@@ -59,36 +107,49 @@ def validar_password_forte(password):
         return "A palavra-passe deve conter pelo menos um caractere especial (ex: !@#$%^&*)."
     return None
 
-def carregar_utilizadores():
-    if not os.path.exists(EXCEL_UTILIZADORES):
-        df = pd.DataFrame([
-            {
-                'Nome': 'Cátia Cardoso', 
-                'Email': 'cadoces023@gmail.com', 
-                'Password': generate_password_hash('1234'), 
-                'Tipo': 'admin',
-                'Telemovel': '351910313162'
-            }
-        ])
-        df.to_excel(EXCEL_UTILIZADORES, index=False)
-    else:
-        df = pd.read_excel(EXCEL_UTILIZADORES)
-        if 'catia@cadoces.com' in df['Email'].values:
-            df.loc[df['Email'] == 'catia@cadoces.com', 'Email'] = 'cadoces023@gmail.com'
-            df.to_excel(EXCEL_UTILIZADORES, index=False)
-        if 'Telemovel' not in df.columns:
-            df['Telemovel'] = ''
-            df.to_excel(EXCEL_UTILIZADORES, index=False)
-    
-    df = pd.read_excel(EXCEL_UTILIZADORES)
-    df['Nome'] = df['Nome'].astype(str)
-    df['Email'] = df['Email'].astype(str)
-    
-    df['Telemovel'] = df['Telemovel'].fillna('').astype(str)
-    df['Telemovel'] = df['Telemovel'].apply(lambda x: x[:-2] if x.endswith('.0') else x)
-    df['Telemovel'] = df['Telemovel'].replace('nan', '')
-    
-    return df
+def enviar_email_recuperacao(email_destino, nova_pass_temp):
+    remetente_email = os.environ.get('MAIL_USERNAME', 'cadoces023@gmail.com')
+    remetente_password = os.environ.get('MAIL_PASSWORD', '').replace(' ', '')
+
+    if not remetente_password:
+        print("⚠️ AVISO: MAIL_PASSWORD não configurada no ambiente. O email não será enviado.")
+        return False
+
+    assunto = "🔑 CáDoces - Recuperação de Palavra-passe"
+    corpo_html = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333; background-color: #fdfbf7; padding: 20px;">
+        <div style="max-width: 500px; margin: auto; background: #fffdf9; border: 2px solid #f3e5d0; padding: 25px; border-radius: 12px;">
+            <h2 style="color: #4A3B32; text-align: center;">CáDoces 🧁</h2>
+            <p>Olá,</p>
+            <p>Recebemos um pedido para repor a palavra-passe da tua conta associada a este email.</p>
+            <div style="background: #f9f0e6; border: 1px dashed #dfa673; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                <span style="font-size: 13px; color: #666;">A tua palavra-passe temporária é:</span><br>
+                <strong style="font-size: 20px; color: #b85d19; letter-spacing: 1px;">{nova_pass_temp}</strong>
+            </div>
+            <p>Utiliza esta palavra-passe temporária para entrar em <a href="https://cadoces-app.onrender.com/login" style="color: #b85d19; font-weight: bold;">https://cadoces-app.onrender.com</a>.</p>
+            <p><strong>Importante:</strong> Assim que entrares no sistema, vai ao menu <em>"Alterar Palavra-passe"</em> para definir a tua palavra-passe pessoal e segura.</p>
+            <br>
+            <p style="font-size: 12px; color: #888; text-align: center;">Se não solicitaste esta alteração, ignora este email.</p>
+        </div>
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = assunto
+    msg['From'] = f"CáDoces <{remetente_email}>"
+    msg['To'] = email_destino
+    msg.attach(MIMEText(corpo_html, 'html'))
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(remetente_email, remetente_password)
+            server.sendmail(remetente_email, email_destino, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"Erro ao enviar email: {e}")
+        return False
 
 # Registo de todos os Blueprints
 app.register_blueprint(receitas_bp)
@@ -112,19 +173,17 @@ def verificar_autenticacao():
 def login():
     erro = None
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "").strip()
         
-        df = carregar_utilizadores()
-        utilizador = df[df['Email'] == email]
+        utilizador = obter_utilizador_por_email(email)
         
-        if not utilizador.empty:
-            hashed_pw = utilizador.iloc[0]['Password']
-            if check_password_hash(hashed_pw, password):
+        if utilizador:
+            if check_password_hash(utilizador['password'], password):
                 session['user_email'] = email
-                session['user_name'] = utilizador.iloc[0]['Nome']
-                session['user_type'] = utilizador.iloc[0]['Tipo']
-                session['user_telemovel'] = str(utilizador.iloc[0].get('Telemovel', ''))
+                session['user_name'] = utilizador['nome']
+                session['user_type'] = utilizador['tipo']
+                session['user_telemovel'] = str(utilizador['telemovel'] or '')
                 
                 inicializar_bd_aluno()
                 
@@ -201,16 +260,18 @@ def recuperar_password():
     
     if request.method == "POST":
         email = request.form.get("email", "").strip()
-        df = carregar_utilizadores()
+        utilizador = obter_utilizador_por_email(email)
         
-        user_indices = df[df['Email'] == email].index
-        if not user_indices.empty:
-            idx = user_indices[0]
+        if utilizador:
             nova_pass_temp = gerar_password_aleatoria()
-            df.loc[idx, 'Password'] = generate_password_hash(nova_pass_temp)
-            df.to_excel(EXCEL_UTILIZADORES, index=False)
+            atualizar_password_bd(email, generate_password_hash(nova_pass_temp))
             
-            mensagem = f"A sua palavra-passe temporária é: <strong>{nova_pass_temp}</strong><br><br>Copie-a e utilize-a para entrar no sistema. Depois de iniciar sessão, altere-a para uma nova palavra-passe à sua escolha."
+            enviado = enviar_email_recuperacao(email, nova_pass_temp)
+            
+            if enviado:
+                mensagem = f"Enviámos um email para <strong>{email}</strong> com a tua palavra-passe temporária. Por favor, verifica a tua caixa de entrada (ou pasta de Spam)."
+            else:
+                mensagem = f"Palavra-passe temporária gerada: <strong>{nova_pass_temp}</strong><br><small>(Nota: O email automático não pôde ser enviado. Guarda a palavra-passe acima para entrar).</small>"
         else:
             erro = "Email não encontrado na base de dados de utilizadores."
 
@@ -240,7 +301,7 @@ def recuperar_password():
     <body>
         <div class="card-box">
             <h2>Repor Palavra-passe 🔑</h2>
-            <p class="sub">Introduza o email associado à sua conta para gerar uma palavra-passe temporária.</p>
+            <p class="sub">Introduza o email associado à sua conta para receber uma palavra-passe temporária por email.</p>
             
             {% if mensagem %}
                 <div class="msg">{{ mensagem | safe }}</div>
@@ -255,7 +316,7 @@ def recuperar_password():
                     <label>Email de Acesso</label>
                     <input type="email" name="email" required placeholder="cadoces023@gmail.com">
                 </div>
-                <button type="submit" class="btn">Gerar Palavra-passe Temporária</button>
+                <button type="submit" class="btn">Enviar Palavra-passe por Email</button>
             </form>
             
             <a href="/login" class="back-link">← Voltar ao Login</a>
@@ -277,25 +338,20 @@ def alterar_password():
         nova_pass = request.form.get("nova_password")
         conf_pass = request.form.get("confirmar_password")
         
-        df = carregar_utilizadores()
         email_atual = session['user_email']
-        user_indices = df[df['Email'] == email_atual].index
+        utilizador = obter_utilizador_por_email(email_atual)
         
-        if not user_indices.empty:
-            idx = user_indices[0]
-            hashed_pw = df.loc[idx, 'Password']
-            
+        if utilizador:
             erro_forte = validar_password_forte(nova_pass)
             
-            if not check_password_hash(hashed_pw, pass_atual):
+            if not check_password_hash(utilizador['password'], pass_atual):
                 erro = "A palavra-passe atual está incorreta."
             elif erro_forte:
                 erro = erro_forte
             elif nova_pass != conf_pass:
                 erro = "A nova palavra-passe e a confirmação não coincidem."
             else:
-                df.loc[idx, 'Password'] = generate_password_hash(nova_pass)
-                df.to_excel(EXCEL_UTILIZADORES, index=False)
+                atualizar_password_bd(email_atual, generate_password_hash(nova_pass))
                 mensagem = "Palavra-passe alterada com sucesso!"
         else:
             erro = "Utilizador não encontrado."
@@ -399,48 +455,57 @@ def gerir_alunos():
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
         
-    df = carregar_utilizadores()
     mensagem = None
     
     if request.method == "POST":
-        nome = request.form.get("nome")
-        email = request.form.get("email")
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip()
         telemovel = request.form.get("telemovel", "").strip()
         
-        if not df[df['Email'] == email].empty:
+        utilizador_existente = obter_utilizador_por_email(email)
+        if utilizador_existente:
             mensagem = "⚠️ Já existe um utilizador com este email!"
         else:
             password_temporaria = gerar_password_aleatoria()
             
-            novo_aluno = {
-                'Nome': nome,
-                'Email': email,
-                'Password': generate_password_hash(password_temporaria),
-                'Tipo': 'aluno',
-                'Telemovel': telemovel
-            }
-            df = pd.concat([df, pd.DataFrame([novo_aluno])], ignore_index=True)
-            df.to_excel(EXCEL_UTILIZADORES, index=False)
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO utilizadores (nome, email, password, tipo, telemovel)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (nome, email, generate_password_hash(password_temporaria), 'aluno', telemovel))
+            conn.commit()
+            conn.close()
             
-            mensagem = f"✅ Aluno adicionado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong> (Guarde esta palavra-passe para partilhar com o aluno)."
+            # Tentar enviar email ao aluno com as credenciais
+            enviado = enviar_email_recuperacao(email, password_temporaria)
+            if enviado:
+                mensagem = f"✅ Aluno registado com sucesso! Foi enviado um email para <strong>{email}</strong> com a palavra-passe temporária (<strong>{password_temporaria}</strong>)."
+            else:
+                mensagem = f"✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong>"
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM utilizadores')
+    alunos = cursor.fetchall()
+    conn.close()
 
     linhas_alunos = ""
-    for idx, row in df.iterrows():
-        nome_val = str(row.get('Nome', '')).replace("'", "\\'")
-        email_val = str(row.get('Email', '')).replace("'", "\\'")
-        tel_val = str(row.get('Telemovel', ''))
-        if tel_val == 'nan' or not tel_val:
-            tel_val = ''
-            
-        tipo_perfil = str(row.get('Tipo', 'aluno'))
+    for u in alunos:
+        idx = u['id']
+        nome_val = str(u['nome']).replace("'", "\\'")
+        email_val = str(u['email']).replace("'", "\\'")
+        tel_val = str(u['telemovel'] or '')
+        tipo_perfil = str(u['tipo'])
         
         btn_editar = f'<button type="button" onclick="abrirModalEditarAluno({idx}, \'{nome_val}\', \'{email_val}\', \'{tel_val}\')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>' if tipo_perfil != 'admin' else ''
         btn_apagar = f'<a href="/admin/alunos/apagar/{idx}" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>' if tipo_perfil != 'admin' else '<i>Protegido</i>'
 
         linhas_alunos += f"""
         <tr>
-            <td data-label="Nome">{row.get('Nome')}</td>
-            <td data-label="Email">{row.get('Email')}</td>
+            <td data-label="Nome">{u['nome']}</td>
+            <td data-label="Email">{u['email']}</td>
             <td data-label="Telemóvel">{tel_val if tel_val else '<span style="color: #999; font-style: italic;">Não definido</span>'}</td>
             <td data-label="Perfil"><span style="background: {'#e8f5e9' if tipo_perfil=='admin' else '#fff3e0'}; color: {'#2e7d32' if tipo_perfil=='admin' else '#b85d19'}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">{tipo_perfil.upper()}</span></td>
             <td data-label="Ações">
@@ -506,7 +571,7 @@ def gerir_alunos():
 
             <div class="card-box">
                 <div class="card-title">Adicionar Novo Aluno</div>
-                <p style="font-size: 13px; color: #666; margin-top: -10px; margin-bottom: 15px;">Ao registar um novo aluno, será gerada automaticamente uma <strong>palavra-passe temporária única</strong> e associado o telemóvel para os testes de WhatsApp.</p>
+                <p style="font-size: 13px; color: #666; margin-top: -10px; margin-bottom: 15px;">Ao registar um novo aluno, será gerada automaticamente uma <strong>palavra-passe temporária única</strong> e enviada para o seu email.</p>
                 <form method="POST">
                     <div class="form-grid">
                         <div class="form-group">
@@ -595,12 +660,15 @@ def editar_aluno(id_idx):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
         
-    df = carregar_utilizadores()
-    if id_idx in df.index and str(df.loc[id_idx, 'Tipo']) != 'admin':
-        df.loc[id_idx, 'Nome'] = str(request.form.get("nome"))
-        df.loc[id_idx, 'Email'] = str(request.form.get("email"))
-        df.loc[id_idx, 'Telemovel'] = str(request.form.get("telemovel", "")).strip()
-        df.to_excel(EXCEL_UTILIZADORES, index=False)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE utilizadores
+        SET nome = ?, email = ?, telemovel = ?
+        WHERE id = ? AND tipo != 'admin'
+    ''', (request.form.get("nome"), request.form.get("email"), request.form.get("telemovel", "").strip(), id_idx))
+    conn.commit()
+    conn.close()
         
     return redirect(url_for('gerir_alunos'))
 
@@ -609,10 +677,11 @@ def apagar_aluno(id_idx):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
         
-    df = carregar_utilizadores()
-    if id_idx in df.index and str(df.loc[id_idx, 'Tipo']) != 'admin':
-        df = df.drop(id_idx)
-        df.to_excel(EXCEL_UTILIZADORES, index=False)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM utilizadores WHERE id = ? AND tipo != 'admin'", (id_idx,))
+    conn.commit()
+    conn.close()
         
     return redirect(url_for('gerir_alunos'))
 
@@ -877,7 +946,6 @@ def index():
                 font-weight: 400;
             }
 
-            /* Estilos Mobile-First / Responsivo para Telemóveis */
             @media screen and (max-width: 768px) {
                 body { padding: 15px; }
                 .grid { grid-template-columns: 1fr; gap: 15px; }
