@@ -1002,6 +1002,12 @@ def gerir_encomendas():
             
             link_email = f"mailto:?subject=Orçamento CáDoces - {r_nome}&body=Olá {r_cliente},%0D%0A%0D%0ASegue em anexo a proposta de orçamento para '{r_nome}' no valor de €{r_total:.2f}.%0D%0A%0D%0MObrigada,%0DCáDoces"
 
+            # Correção aplicada aqui (substituição segura de aspas nas variáveis para evitar erros de sintaxe nas f-strings/parâmetros JS)
+            saf_nome = r_nome.replace("'", "\\'")
+            saf_cliente = r_cliente.replace("'", "\\'")
+            saf_notas = r_notas.replace("'", "\\'")
+            saf_pessoas = r_num_pessoas.replace("'", "\\'")
+
             linhas_orc += f"""
             <tr>
                 <td data-label="Nome do Orçamento"><strong>{row.get('Nome', 'Sem Nome')}</strong></td>
@@ -1011,7 +1017,7 @@ def gerir_encomendas():
                 <td data-label="Estado"><span style="background: {bg_Badge}; color: {cor_Badge}; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px;">{estado}</span></td>
                 <td data-label="Ações" style="text-align: right;">
                     <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
-                        <button type="button" onclick="abrirModalEditar('{id_orc}', '{r_nome}', '{r_cliente}', '{r_data}', '{r_total}', '{r_notas}', '{r_num_pessoas}')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>
+                        <button type="button" onclick="abrirModalEditar('{id_orc}', '{saf_nome}', '{saf_cliente}', '{r_data}', '{r_total}', '{saf_notas}', '{saf_pessoas}')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>
                         <a href="/encomendas/pdf/{id_orc}" style="color: #b85d19; text-decoration: none; font-size: 16px;" title="Descarregar PDF">📄</a>
                         <a href="{link_whatsapp}" target="_blank" style="color: #27ae60; text-decoration: none; font-size: 16px;" title="Enviar por WhatsApp">💬</a>
                         <a href="{link_email}" style="color: #2980b9; text-decoration: none; font-size: 16px;" title="Enviar por Email">✉️</a>
@@ -1061,6 +1067,8 @@ def gerir_encomendas():
 
             badge_notas = f"<br><span style='font-size: 11px; background: #fdf3e3; color: #b85d19; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 3px;' title='{notas_val}'>⚠️ {notas_val[:30]}{'...' if len(notas_val) > 30 else ''}</span>" if notas_val.strip() else ""
 
+            saf_notas_enc = notas_val.replace("'", "\\'")
+
             linhas_enc += f"""
             <tr>
                 <td data-label="Cliente"><strong>{row.get('Cliente', 'Cliente desconhecido')}</strong><br><span style="font-size: 12px; color: #777;">{row.get('Nome', '')}</span>{badge_notas}</td>
@@ -1088,8 +1096,8 @@ def gerir_encomendas():
                 </td>
                 <td data-label="Ações" style="text-align: right;">
                     <div style="display: flex; align-items: center; gap: 14px; justify-content: flex-end;">
-                        <button type="button" onclick="abrirModalEditarEncomenda('{id_enc}', '{cliente_val}', '{nome_val}', '{data_entrega}', {valor_val}, '{notas_val.replace("'", "\\'")}')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>
-                        <button type="button" onclick="abrirModalDetalhes('{cliente_val}', '{nome_val}', '{data_entrega}', '{estado_atual}', {valor_val}, {itens_json}, '{notas_val.replace("'", "\\'")}')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Ver Detalhes">👁️</button>
+                        <button type="button" onclick="abrirModalEditarEncomenda('{id_enc}', '{cliente_val}', '{nome_val}', '{data_entrega}', {valor_val}, '{saf_notas_enc}')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>
+                        <button type="button" onclick="abrirModalDetalhes('{cliente_val}', '{nome_val}', '{data_entrega}', '{estado_atual}', {valor_val}, {itens_json}, '{saf_notas_enc}')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Ver Detalhes">👁️</button>
                         <a href="/encomendas/duplicar/{id_enc}" style="color: #b85d19; text-decoration: none; font-size: 16px;" title="Repetir / Duplicar Encomenda">🔄</a>
                         <a href="/encomendas/apagar/{id_enc}" onclick="return confirm('Tem certeza que deseja apagar esta encomenda?')" style="color: #c0392b; text-decoration: none; font-size: 16px;" title="Apagar">🗑️</a>
                     </div>
