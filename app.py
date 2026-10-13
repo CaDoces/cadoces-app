@@ -361,6 +361,9 @@ def gerir_alunos():
             
         tipo_perfil = str(row.get('Tipo', 'aluno'))
         
+        btn_editar = f'<button type="button" onclick="abrirModalEditarAluno({idx}, \'{nome_val}\', \'{email_val}\', \'{tel_val}\')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>' if tipo_perfil != 'admin' else ''
+        btn_apagar = f'<a href="/admin/alunos/apagar/{idx}" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>' if tipo_perfil != 'admin' else '<i>Protegido</i>'
+
         linhas_alunos += f"""
         <tr>
             <td data-label="Nome">{row.get('Nome')}</td>
@@ -369,8 +372,8 @@ def gerir_alunos():
             <td data-label="Perfil"><span style="background: {'#e8f5e9' if tipo_perfil=='admin' else '#fff3e0'}; color: {'#2e7d32' if tipo_perfil=='admin' else '#b85d19'}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">{tipo_perfil.upper()}</span></td>
             <td data-label="Ações">
                 <div style="display: flex; align-items: center; gap: 12px; justify-content: flex-end;">
-                    {'<button type="button" onclick="abrirModalEditarAluno(' + str(idx) + ', \'' + nome_val + '\', \'' + email_val + '\', \'' + tel_val + '\')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>' if tipo_perfil != 'admin' else ''}
-                    {'<a href="/admin/alunos/apagar/' + str(idx) + '" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>' if tipo_perfil != 'admin' else '<i>Protegido</i>'}
+                    {btn_editar}
+                    {btn_apagar}
                 </div>
             </td>
         </tr>
