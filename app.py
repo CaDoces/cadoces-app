@@ -4,6 +4,7 @@ import random
 import string
 import re
 import smtplib
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -107,49 +108,52 @@ def validar_password_forte(password):
         return "A palavra-passe deve conter pelo menos um caractere especial (ex: !@#$%^&*)."
     return None
 
-def enviar_email_recuperacao(email_destino, nova_pass_temp):
-    remetente_email = os.environ.get('MAIL_USERNAME', 'cadoces023@gmail.com')
-    remetente_password = os.environ.get('MAIL_PASSWORD', '').replace(' ', '')
+def enviar_email_recuperacao_async(email_destino, nova_pass_temp):
+    def enviar():
+        remetente_email = os.environ.get('MAIL_USERNAME', 'cadoces023@gmail.com')
+        remetente_password = os.environ.get('MAIL_PASSWORD', '').replace(' ', '')
 
-    if not remetente_password:
-        print("⚠️ AVISO: MAIL_PASSWORD não configurada no ambiente. O email não será enviado.")
-        return False
+        if not remetente_password:
+            print("⚠️ AVISO: MAIL_PASSWORD não configurada no ambiente.")
+            return
 
-    assunto = "🔑 CáDoces - Recuperação de Palavra-passe"
-    corpo_html = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; color: #333; background-color: #fdfbf7; padding: 20px;">
-        <div style="max-width: 500px; margin: auto; background: #fffdf9; border: 2px solid #f3e5d0; padding: 25px; border-radius: 12px;">
-            <h2 style="color: #4A3B32; text-align: center;">CáDoces 🧁</h2>
-            <p>Olá,</p>
-            <p>Recebemos um pedido para repor a palavra-passe da tua conta associada a este email.</p>
-            <div style="background: #f9f0e6; border: 1px dashed #dfa673; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
-                <span style="font-size: 13px; color: #666;">A tua palavra-passe temporária é:</span><br>
-                <strong style="font-size: 20px; color: #b85d19; letter-spacing: 1px;">{nova_pass_temp}</strong>
+        assunto = "🔑 CáDoces - Recuperação de Palavra-passe"
+        corpo_html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333; background-color: #fdfbf7; padding: 20px;">
+            <div style="max-width: 500px; margin: auto; background: #fffdf9; border: 2px solid #f3e5d0; padding: 25px; border-radius: 12px;">
+                <h2 style="color: #4A3B32; text-align: center;">CáDoces 🧁</h2>
+                <p>Olá,</p>
+                <p>Recebemos um pedido para repor a palavra-passe da tua conta associada a este email.</p>
+                <div style="background: #f9f0e6; border: 1px dashed #dfa673; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                    <span style="font-size: 13px; color: #666;">A tua palavra-passe temporária é:</span><br>
+                    <strong style="font-size: 20px; color: #b85d19; letter-spacing: 1px;">{nova_pass_temp}</strong>
+                </div>
+                <p>Utiliza esta palavra-passe temporária para entrar em <a href="https://cadoces-app.onrender.com/login" style="color: #b85d19; font-weight: bold;">https://cadoces-app.onrender.com</a>.</p>
+                <p><strong>Importante:</strong> Assim que entrares no sistema, vai ao menu <em>"Alterar Palavra-passe"</em> para definir a tua palavra-passe pessoal e segura.</p>
+                <br>
+                <p style="font-size: 12px; color: #888; text-align: center;">Se não solicitaste esta alteração, ignora este email.</p>
             </div>
-            <p>Utiliza esta palavra-passe temporária para entrar em <a href="https://cadoces-app.onrender.com/login" style="color: #b85d19; font-weight: bold;">https://cadoces-app.onrender.com</a>.</p>
-            <p><strong>Importante:</strong> Assim que entrares no sistema, vai ao menu <em>"Alterar Palavra-passe"</em> para definir a tua palavra-passe pessoal e segura.</p>
-            <br>
-            <p style="font-size: 12px; color: #888; text-align: center;">Se não solicitaste esta alteração, ignora este email.</p>
-        </div>
-    </body>
-    </html>
-    """
+        </body>
+        </html>
+        """
 
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = assunto
-    msg['From'] = f"CáDoces <{remetente_email}>"
-    msg['To'] = email_destino
-    msg.attach(MIMEText(corpo_html, 'html'))
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = assunto
+        msg['From'] = f"CáDoces <{remetente_email}>"
+        msg['To'] = email_destino
+        msg.attach(MIMEText(corpo_html, 'html'))
 
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(remetente_email, remetente_password)
-            server.sendmail(remetente_email, email_destino, msg.as_string())
-        return True
-    except Exception as e:
-        print(f"Erro ao enviar email: {e}")
-        return False
+        try:
+            with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as server:
+                server.starttls()
+                server.login(remetente_email, remetente_password)
+                server.sendmail(remetente_email, email_destino, msg.as_string())
+            print(f"✅ Email enviado com sucesso para {email_destino}")
+        except Exception as e:
+            print(f"❌ Erro ao enviar email: {e}")
+
+    threading.Thread(target=enviar).start()
 
 # Registo de todos os Blueprints
 app.register_blueprint(receitas_bp)
@@ -266,12 +270,10 @@ def recuperar_password():
             nova_pass_temp = gerar_password_aleatoria()
             atualizar_password_bd(email, generate_password_hash(nova_pass_temp))
             
-            enviado = enviar_email_recuperacao(email, nova_pass_temp)
+            # Envio em segundo plano assíncrono (não bloqueia a página)
+            enviar_email_recuperacao_async(email, nova_pass_temp)
             
-            if enviado:
-                mensagem = f"Enviámos um email para <strong>{email}</strong> com a tua palavra-passe temporária. Por favor, verifica a tua caixa de entrada (ou pasta de Spam)."
-            else:
-                mensagem = f"Palavra-passe temporária gerada: <strong>{nova_pass_temp}</strong><br><small>(Nota: O email automático não pôde ser enviado. Guarda a palavra-passe acima para entrar).</small>"
+            mensagem = f"Enviámos um email para <strong>{email}</strong> com a tua palavra-passe temporária. Por favor, verifica a tua caixa de entrada (ou pasta de Spam)."
         else:
             erro = "Email não encontrado na base de dados de utilizadores."
 
@@ -477,12 +479,9 @@ def gerir_alunos():
             conn.commit()
             conn.close()
             
-            # Tentar enviar email ao aluno com as credenciais
-            enviado = enviar_email_recuperacao(email, password_temporaria)
-            if enviado:
-                mensagem = f"✅ Aluno registado com sucesso! Foi enviado um email para <strong>{email}</strong> com a palavra-passe temporária (<strong>{password_temporaria}</strong>)."
-            else:
-                mensagem = f"✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong>"
+            # Enviar email ao aluno em segundo plano
+            enviar_email_recuperacao_async(email, password_temporaria)
+            mensagem = f"✅ Aluno registado com sucesso! Foi enviada uma palavra-passe temporária para <strong>{email}</strong> (temporária: <strong>{password_temporaria}</strong>)."
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
