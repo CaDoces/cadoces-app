@@ -104,7 +104,7 @@ app.register_blueprint(portfolio_bp)
 
 @app.before_request
 def verificar_autenticacao():
-    rotas_livres = ['login', 'static']
+    rotas_livres = ['login', 'recuperar_password', 'static']
     if request.endpoint not in rotas_livres and 'user_email' not in session:
         return redirect(url_for('login'))
 
@@ -151,6 +151,8 @@ def login():
             .btn { width: 100%; background: #dfa673; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; }
             .btn:hover { background: #c8915f; }
             .error { color: #c62828; font-size: 13px; text-align: center; margin-bottom: 15px; background: #ffebee; padding: 8px; border-radius: 6px; }
+            .forgot-link { display: block; text-align: right; font-size: 12px; color: #b85d19; text-decoration: none; margin-top: 6px; font-weight: bold; }
+            .forgot-link:hover { text-decoration: underline; }
         </style>
     </head>
     <body>
@@ -170,6 +172,7 @@ def login():
                         <input type="password" name="password" id="loginPassword" required placeholder="••••••••">
                         <button type="button" class="toggle-btn" onclick="togglePassword('loginPassword', this)">👁️</button>
                     </div>
+                    <a href="/recuperar_password" class="forgot-link">Esqueceu-se da palavra-passe?</a>
                 </div>
                 <button type="submit" class="btn">Entrar</button>
             </form>
@@ -190,6 +193,76 @@ def login():
     </body>
     </html>
     """, erro=erro)
+
+@app.route("/recuperar_password", methods=["GET", "POST"])
+def recuperar_password():
+    mensagem = None
+    erro = None
+    
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        df = carregar_utilizadores()
+        
+        user_indices = df[df['Email'] == email].index
+        if not user_indices.empty:
+            idx = user_indices[0]
+            nova_pass_temp = gerar_password_aleatoria()
+            df.loc[idx, 'Password'] = generate_password_hash(nova_pass_temp)
+            df.to_excel(EXCEL_UTILIZADORES, index=False)
+            
+            mensagem = f"A sua palavra-passe temporária é: <strong>{nova_pass_temp}</strong><br><br>Copie-a e utilize-a para entrar no sistema. Depois de iniciar sessão, altere-a para uma nova palavra-passe à sua escolha."
+        else:
+            erro = "Email não encontrado na base de dados de utilizadores."
+
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CáDoces - Reposição de Palavra-passe</title>
+        <style>
+            body { font-family: Arial, sans-serif; background-color: #fdfbf7; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; color: #333; padding: 15px; box-sizing: border-box; }
+            .card-box { background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 30px; width: 100%; max-width: 420px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); box-sizing: border-box; }
+            h2 { margin-top: 0; color: #111; text-align: center; margin-bottom: 15px; font-size: 20px; }
+            p.sub { font-size: 13px; color: #666; text-align: center; margin-bottom: 20px; line-height: 1.4; }
+            .form-group { margin-bottom: 20px; }
+            label { display: block; font-size: 13px; font-weight: bold; color: #333; margin-bottom: 6px; }
+            input { width: 100%; padding: 12px; border: 2px solid #f3e5d0; border-radius: 8px; box-sizing: border-box; font-size: 14px; outline: none; background: #fff; }
+            .btn { width: 100%; background: #dfa673; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; }
+            .btn:hover { background: #c8915f; }
+            .msg { background: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; line-height: 1.5; border: 1px solid #c8e6c9; word-break: break-all; }
+            .error { color: #c62828; font-size: 13px; text-align: center; margin-bottom: 15px; background: #ffebee; padding: 8px; border-radius: 6px; }
+            .back-link { display: block; text-align: center; margin-top: 18px; color: #b85d19; text-decoration: none; font-weight: bold; font-size: 13px; }
+            .back-link:hover { text-decoration: underline; }
+        </style>
+    </head>
+    <body>
+        <div class="card-box">
+            <h2>Repor Palavra-passe 🔑</h2>
+            <p class="sub">Introduza o email associado à sua conta para gerar uma palavra-passe temporária.</p>
+            
+            {% if mensagem %}
+                <div class="msg">{{ mensagem | safe }}</div>
+            {% endif %}
+            
+            {% if erro %}
+                <div class="error">{{ erro }}</div>
+            {% endif %}
+
+            <form method="POST">
+                <div class="form-group">
+                    <label>Email de Acesso</label>
+                    <input type="email" name="email" required placeholder="cadoces023@gmail.com">
+                </div>
+                <button type="submit" class="btn">Gerar Palavra-passe Temporária</button>
+            </form>
+            
+            <a href="/login" class="back-link">← Voltar ao Login</a>
+        </div>
+    </body>
+    </html>
+    """, mensagem=mensagem, erro=erro)
 
 @app.route("/alterar_password", methods=["GET", "POST"])
 def alterar_password():
