@@ -110,8 +110,8 @@ def validar_password_forte(password):
 
 def enviar_email_recuperacao_async(email_destino, nova_pass_temp):
     def enviar():
-        remetente_email = os.environ.get('MAIL_USERNAME', 'cadoces023@gmail.com')
-        remetente_password = os.environ.get('MAIL_PASSWORD', '').replace(' ', '')
+        remetente_email = os.environ.get('MAIL_USERNAME', 'cadoces023@gmail.com').strip()
+        remetente_password = os.environ.get('MAIL_PASSWORD', '').replace(' ', '').strip()
 
         if not remetente_password:
             print("⚠️ AVISO: MAIL_PASSWORD não configurada no ambiente.")
@@ -145,13 +145,14 @@ def enviar_email_recuperacao_async(email_destino, nova_pass_temp):
         msg.attach(MIMEText(corpo_html, 'html'))
 
         try:
-            with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as server:
+            print(f"📧 A ligar ao SMTP do Gmail para enviar para {email_destino}...")
+            with smtplib.SMTP('smtp.gmail.com', 587, timeout=15) as server:
                 server.starttls()
                 server.login(remetente_email, remetente_password)
                 server.sendmail(remetente_email, email_destino, msg.as_string())
-            print(f"✅ Email enviado com sucesso para {email_destino}")
+            print(f"✅ EMAIL ENVIADO COM SUCESSO PARA {email_destino}")
         except Exception as e:
-            print(f"❌ Erro ao enviar email: {e}")
+            print(f"❌ ERRO SMTP AO ENVIAR EMAIL: {str(e)}")
 
     threading.Thread(target=enviar).start()
 
