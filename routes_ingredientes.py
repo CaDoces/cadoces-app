@@ -201,7 +201,7 @@ HTML_TEMPLATE = """
             <a href="/" class="back-btn">&#8592;</a>
             <div>
                 <h1>Ingredientes e Materiais</h1>
-                <p class="sub">Gestão integrada de stock por unidades inteiras e custos</p>
+                <p class="sub">Gestão integrada de stock por unidades e custos</p>
             </div>
         </div>
         <div class="top-actions">
@@ -245,7 +245,7 @@ HTML_TEMPLATE = """
                     {% for item in lista_compras %}
                     <tr>
                         <td data-label="Ingrediente"><strong>{{ item.nome }}</strong></td>
-                        <td data-label="Stock Atual">{{ item.stock_unidades|int }} {{ item.unidade }} ({{ item.stock|int }}{{ item.unidade }})</td>
+                        <td data-label="Stock Atual">{{ item.stock_unidades|int if item.stock_unidades == item.stock_unidades|int else item.stock_unidades }} {{ item.unidade }} ({{ item.stock|int if item.stock == item.stock|int else item.stock }}{{ item.unidade }})</td>
                         <td data-label="Estado"><span style="background: #FDEDEC; color: #C0392B; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px;">Esgotado / Baixo</span></td>
                         <td data-label="Preço Estimado" class="cost-val">€{{ "%.2f"|format(item.valor) }}</td>
                     </tr>
@@ -354,7 +354,7 @@ HTML_TEMPLATE = """
                 </thead>
                 <tbody>
                     {% for item in lista %}
-                    <tr>
+                    <tr id="item-{{ item.original_index }}">
                         <td class="select-col"><input type="checkbox" name="selecionado" value="{{ item.original_index }}"></td>
                         <td data-label="Unidade">{{ item.unidade }}</td>
                         <td data-label="Nome"><strong>{{ item.nome }}</strong></td>
@@ -369,7 +369,9 @@ HTML_TEMPLATE = """
                                 <form action="{{ url_for('ingredientes_bp.decrementar_stock', index=item.original_index) }}" method="POST" style="display:inline;">
                                     <button type="submit" class="unit-btn" title="Menos uma unidade">-</button>
                                 </form>
-                                <span style="font-weight: 600; min-width: 24px; text-align: center;">{{ item.stock_unidades|int }}</span>
+                                <form action="{{ url_for('ingredientes_bp.atualizar_stock_unidades', index=item.original_index) }}" method="POST" style="display:inline-flex; align-items: center; margin: 0;">
+                                    <input type="text" name="stock_unidades" value="{{ item.stock_unidades|int if item.stock_unidades == item.stock_unidades|int else item.stock_unidades }}" onchange="this.form.submit()" style="width: 50px; padding: 2px 4px; border: 1px solid #EEDCCE; border-radius: 4px; text-align: center; font-size: 13px; font-weight: 600; background: #FFFFFF; color: #4A3B32;" title="Escreve e prime Enter ou clica fora" />
+                                </form>
                                 <form action="{{ url_for('ingredientes_bp.incrementar_stock', index=item.original_index) }}" method="POST" style="display:inline;">
                                     <button type="submit" class="unit-btn" title="Mais uma unidade">+</button>
                                 </form>
@@ -557,7 +559,7 @@ def incrementar_stock(index):
         conn.commit()
     conn.close()
 
-    return redirect(url_for("ingredientes_bp.ingredientes"))
+    return redirect(url_for("ingredientes_bp.ingredientes") + f"#item-{index}")
 
 @ingredientes_bp.route("/decrementar_stock/<int:index>", methods=["POST"])
 def decrementar_stock(index):
@@ -582,7 +584,34 @@ def decrementar_stock(index):
         conn.commit()
     conn.close()
 
-    return redirect(url_for("ingredientes_bp.ingredientes"))
+    return redirect(url_for("ingredientes_bp.ingredientes") + f"#item-{index}")
+
+@ingredientes_bp.route("/atualizar_stock_unidades/<int:index>", methods=["POST"])
+def atualizar_stock_unidades(index):
+    user_email = session.get('user_email')
+    if not user_email:
+        return redirect('/')
+
+    stock_unidades_raw = request.form.get("stock_unidades", "0")
+    stock_unidades = parse_val(stock_unidades_raw)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT quantidade FROM ingredientes_db WHERE id = ? AND user_email = ?", (index, user_email))
+    row = cursor.fetchone()
+    if row:
+        quantidade = parse_val(row['quantidade'])
+        novo_stock = stock_unidades * quantidade
+        
+        cursor.execute('''
+            UPDATE ingredientes_db
+            SET stock_unidades = ?, stock = ?
+            WHERE id = ? AND user_email = ?
+        ''', (stock_unidades, novo_stock, index, user_email))
+        conn.commit()
+    conn.close()
+
+    return redirect(url_for("ingredientes_bp.ingredientes") + f"#item-{index}")
 
 @ingredientes_bp.route("/apagar/<int:index>", methods=["POST"])
 def apagar(index):
