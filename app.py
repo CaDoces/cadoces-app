@@ -7,6 +7,7 @@ import re
 import pandas as pd
 import sqlite3
 from flask import Flask, render_template_string, session, redirect, url_for, request
+from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Importação dos módulos da CáDoces
@@ -23,7 +24,20 @@ from routes_portfolio import portfolio_bp
 from database import inicializar_bd_aluno
 
 app = Flask(__name__)
-app.secret_key = 'cadoces_segredo_super_importante'
+app.secret_key = os.environ.get('SECRET_KEY', 'cadoces_segredo_super_importante')
+
+# --- CONFIGURAÇÃO DA AUTENTICAÇÃO HTTP BASIC AUTH ---
+auth = HTTPBasicAuth()
+
+# Pega nos dados das variáveis de ambiente no Render ou usa estes valores padrão:
+ADMIN_USER = os.environ.get('APP_USERNAME', 'cadoces')
+ADMIN_PASS = os.environ.get('APP_PASSWORD', 'cadoces2026')
+
+@auth.verify_password
+def verify_password(username, password):
+    if username == ADMIN_USER and password == ADMIN_PASS:
+        return username
+    return None
 
 DB_PATH = 'cadoces.db'
 
@@ -295,6 +309,7 @@ def recuperar_password():
     """, mensagem=mensagem, erro=erro)
 
 @app.route("/admin/pedidos_recuperacao")
+@auth.login_required
 def listar_pedidos_recuperacao():
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
@@ -364,6 +379,7 @@ def listar_pedidos_recuperacao():
     """, linhas=linhas)
 
 @app.route("/admin/pedidos_recuperacao/apagar/<int:pid>")
+@auth.login_required
 def apagar_pedido_recuperacao(pid):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
@@ -376,6 +392,7 @@ def apagar_pedido_recuperacao(pid):
     return redirect(url_for('listar_pedidos_recuperacao'))
 
 @app.route("/alterar_password", methods=["GET", "POST"])
+@auth.login_required
 def alterar_password():
     if 'user_email' not in session:
         return redirect(url_for('login'))
@@ -501,6 +518,7 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route("/admin/alunos", methods=["GET", "POST"])
+@auth.login_required
 def gerir_alunos():
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
@@ -702,6 +720,7 @@ def gerir_alunos():
     """, msg_html=msg_html, linhas_alunos=linhas_alunos)
 
 @app.route("/admin/alunos/editar/<int:id_idx>", methods=["POST"])
+@auth.login_required
 def editar_aluno(id_idx):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
@@ -719,6 +738,7 @@ def editar_aluno(id_idx):
     return redirect(url_for('gerir_alunos'))
 
 @app.route("/admin/alunos/apagar/<int:id_idx>")
+@auth.login_required
 def apagar_aluno(id_idx):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
@@ -734,6 +754,7 @@ def apagar_aluno(id_idx):
 # --- PAINEL PRINCIPAL ---
 
 @app.route("/")
+@auth.login_required
 def index():
     user_name = session.get('user_name', 'Cátia Cardoso')
     user_type = session.get('user_type', 'aluno')
@@ -1126,4 +1147,3 @@ def index():
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
-  
