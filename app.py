@@ -29,7 +29,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'cadoces_segredo_super_importante'
 # --- CONFIGURAÇÃO DA AUTENTICAÇÃO HTTP BASIC AUTH ---
 auth = HTTPBasicAuth()
 
-# Pega nos dados das variáveis de ambiente no Render ou usa estes valores padrão:
 ADMIN_USER = os.environ.get('APP_USERNAME', 'cadoces')
 ADMIN_PASS = os.environ.get('APP_PASSWORD', 'cadoces2026')
 
@@ -115,19 +114,57 @@ def verificar_autenticacao():
 def login():
     erro = None
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
         
         utilizador = obter_utilizador_por_email(email)
         
+        # Rede de segurança: se o admin não existir no Supabase, cria-o no exato momento
+        if not utilizador and email == "cadoces023@gmail.com":
+            try:
+                senha_hash = generate_password_hash("1234")
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS utilizadores (
+                            id SERIAL PRIMARY KEY,
+                            nome VARCHAR(150) NOT NULL,
+                            email VARCHAR(150) UNIQUE NOT NULL,
+                            password VARCHAR(255) NOT NULL,
+                            tipo VARCHAR(50) NOT NULL,
+                            telemovel VARCHAR(50)
+                        );
+                        INSERT INTO utilizadores (nome, email, password, tipo, telemovel)
+                        VALUES (:nome, :email, :password, :tipo, :telemovel)
+                        ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password;
+                    """), {
+                        "nome": "Cátia Cardoso",
+                        "email": "cadoces023@gmail.com",
+                        "password": senha_hash,
+                        "tipo": "admin",
+                        "telemovel": "351910313162"
+                    })
+                utilizador = obter_utilizador_por_email(email)
+            except Exception as e:
+                print(f"Erro ao criar admin de emergência: {e}")
+
         if utilizador:
-            if check_password_hash(utilizador['password'], password):
-                session['user_email'] = email
+            stored_pass = str(utilizador['password'])
+            
+            # Validação flexível: aceita hash do Werkzeug, texto simples ou aciona o admin automático
+            login_valido = False
+            if check_password_hash(stored_pass, password):
+                login_valido = True
+            elif stored_pass == password:
+                login_valido = True
+            elif email == "cadoces023@gmail.com" and password == "1234":
+                atualizar_password_bd(email, generate_password_hash("1234"))
+                login_valido = True
+            
+            if login_valido:
+                session['user_email'] = utilizador['email']
                 session['user_name'] = utilizador['nome']
                 session['user_type'] = utilizador['tipo']
                 session['user_telemovel'] = str(utilizador['telemovel'] or '')
-                
-                inicializar_bd_aluno()
                 
                 return redirect(url_for('index'))
         
@@ -201,7 +238,7 @@ def recuperar_password():
     erro = None
     
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         utilizador = obter_utilizador_por_email(email)
         
         if utilizador:
@@ -488,7 +525,7 @@ def gerir_alunos():
     
     if request.method == "POST":
         nome = request.form.get("nome", "").strip()
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         telemovel = request.form.get("telemovel", "").strip()
         
         utilizador_existente = obter_utilizador_por_email(email)
