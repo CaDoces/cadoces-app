@@ -24,7 +24,7 @@ else:
 EXCEL_FILES = [
     'clientes', 'compras', 'custos_fixos', 'despesas',
     'encomendas', 'financeira_dados', 'ingredientes',
-    * 'lista_compras', 'lista_geral', 'mao_de_obra',
+    'lista_compras', 'lista_geral', 'mao_de_obra',
     'maodeobra', 'materiais', 'orçamentos', 'receitas'
 ]
 
@@ -80,10 +80,10 @@ def inicializar_bd_aluno():
                 );
             """))
             
-            # Gera o hash dinamicamente usando a biblioteca oficial do Werkzeug
+            # Gera o hash dinamicamente usando a biblioteca oficial do Werkzeug para '1234'
             senha_hash = generate_password_hash("1234")
             
-            # Insere ou atualiza o administrador principal com o hash fresco
+            # Insere ou atualiza o administrador principal
             conn.execute(text("""
                 INSERT INTO utilizadores (nome, email, password, tipo, telemovel) 
                 VALUES (:nome, :email, :password, :tipo, :telemovel)
