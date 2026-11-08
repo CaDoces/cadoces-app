@@ -4,5 +4,5 @@ pandas
 openpyxl
 reportlab
 Flask-SQLAlchemy
-psycopg2-binary
+psycopg[binary]
 gunicorn
