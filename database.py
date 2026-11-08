@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from flask import session
 from sqlalchemy import create_engine, text
+from werkzeug.security import generate_password_hash
 
 # Lê a URL do Supabase configurada nas variáveis de ambiente do Render
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -35,23 +36,19 @@ def get_table_name(filename):
     """Converte o nome do ficheiro Excel (ex: 'clientes.xlsx') num nome de tabela seguro (ex: 'clientes')."""
     base_name = filename.replace('.xlsx', '').replace('-', '_')
     user_suffix = get_safe_user_email()
-    # Exemplo de nome de tabela na BD: clientes_catia_gmail_com
     return f"{base_name}_{user_suffix}"
 
 def get_excel_path(filename):
     """
-    Mantém compatibilidade com funções antigas: 
     Lê os dados da tabela do utilizador no Supabase e devolve um DataFrame do Pandas.
     Se a tabela não existir na base de dados, cria-a vazia.
     """
     table_name = get_table_name(filename)
     
     try:
-        # Tenta ler a tabela do utilizador do Supabase
         query = f"SELECT * FROM {table_name}"
         df = pd.read_sql(query, con=engine)
     except Exception:
-        # Se a tabela não existir, cria um DataFrame vazio e grava na base de dados
         df = pd.DataFrame()
         try:
             df.to_sql(table_name, con=engine, if_exists='replace', index=False)
@@ -61,6 +58,30 @@ def get_excel_path(filename):
     return df
 
 def inicializar_bd_aluno():
-    """Inicializa todas as tabelas necessárias para o aluno autenticado quando faz login."""
+    """Inicializa todas as tabelas necessárias e garante que o utilizador admin existe no Supabase."""
+    try:
+        with engine.begin() as conn:
+            # 1. Cria a tabela global de utilizadores se ainda não existir
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS utilizadores (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(150) UNIQUE NOT NULL,
+                    senha_hash VARCHAR(255) NOT NULL
+                );
+            """))
+            
+            # 2. Insere o utilizador administrador predefinido se a tabela estiver vazia
+            result = conn.execute(text("SELECT COUNT(*) FROM utilizadores WHERE email = :email"), {"email": "cadoces023@gmail.com"}).scalar()
+            if result == 0:
+                senha_inicial = generate_password_hash("1234")
+                conn.execute(text("""
+                    INSERT INTO utilizadores (email, senha_hash) 
+                    VALUES (:email, :senha_hash)
+                """), {"email": "cadoces023@gmail.com", "senha_hash": senha_inicial})
+                print("Utilizador administrador criado com sucesso na base de dados!")
+    except Exception as e:
+        print(f"Erro ao inicializar tabela de utilizadores: {e}")
+
+    # 3. Inicializa as tabelas de dados dinâmicas para o utilizador atual
     for filename in EXCEL_FILES:
         get_excel_path(filename)
