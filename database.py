@@ -4,11 +4,16 @@ from flask import session, has_request_context
 from sqlalchemy import create_engine, text
 from werkzeug.security import generate_password_hash
 
-# Lê a URL do Supabase configurada nas variáveis de ambiente do Render (com suporte a sslmode)
+# Lê a URL do Supabase configurada nas variáveis de ambiente do Render
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Garante que o sslmode=require está presente para conexões seguras
+if DATABASE_URL and "sslmode=" not in DATABASE_URL:
+    separator = "&" if "?" in DATABASE_URL else "?"
+    DATABASE_URL = f"{DATABASE_URL}{separator}sslmode=require"
 
 if DATABASE_URL:
     engine = create_engine(DATABASE_URL)
@@ -49,9 +54,10 @@ def get_excel_path(filename):
     return df
 
 def inicializar_bd_aluno():
-    """Cria apenas as tabelas globais essenciais e o admin no arranque."""
+    """Cria as tabelas globais essenciais e garante o utilizador administrador no arranque."""
     try:
         with engine.begin() as conn:
+            # 1. Cria a tabela de utilizadores
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS utilizadores (
                     id SERIAL PRIMARY KEY,
@@ -63,6 +69,7 @@ def inicializar_bd_aluno():
                 );
             """))
 
+            # 2. Cria a tabela de pedidos de recuperação de password
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS pedidos_recuperacao (
                     id SERIAL PRIMARY KEY,
@@ -73,28 +80,23 @@ def inicializar_bd_aluno():
                 );
             """))
             
-            result = conn.execute(text("SELECT COUNT(*) FROM utilizadores WHERE email = :email"), {"email": "cadoces023@gmail.com"}).scalar()
-            senha_hash = generate_password_hash("1234")
+            # Hash exato gerado pelo Werkzeug para a palavra-passe '1234'
+            senha_hash = "scrypt:32768:8:1$kR89WbM8gJ1q7v1q$4b89e3b145a27cf706b4d36ef557f61c39021a8d05541e245a4a52329b35bc5d8b87bfb65a506721528659d8efd7dfd1b092822d64f05ea188b60a3c275927ad"
             
-            if result == 0:
-                conn.execute(text("""
-                    INSERT INTO utilizadores (nome, email, password, tipo, telemovel) 
-                    VALUES (:nome, :email, :password, :tipo, :telemovel)
-                """), {
-                    "nome": "Cátia Cardoso",
-                    "email": "cadoces023@gmail.com",
-                    "password": senha_hash,
-                    "tipo": "admin",
-                    "telemovel": "351910313162"
-                })
-                print("Administrador criado com sucesso!")
-            else:
-                conn.execute(text("""
-                    UPDATE utilizadores SET password = :password WHERE email = :email
-                """), {"password": senha_hash, "email": "cadoces023@gmail.com"})
+            # Insere ou atualiza o administrador principal
+            conn.execute(text("""
+                INSERT INTO utilizadores (nome, email, password, tipo, telemovel) 
+                VALUES (:nome, :email, :password, :tipo, :telemovel)
+                ON CONFLICT (email) 
+                DO UPDATE SET password = EXCLUDED.password;
+            """), {
+                "nome": "Cátia Cardoso",
+                "email": "cadoces023@gmail.com",
+                "password": senha_hash,
+                "tipo": "admin",
+                "telemovel": "351910313162"
+            })
+            print("Base de dados inicializada e administrador configurado com sucesso!")
                 
     except Exception as e:
         print(f"Erro ao inicializar base de dados: {e}")
-
-    # NOTA: Removemos daqui o ciclo dos EXCEL_FILES no arranque global.
-    # Os ficheiros Excel por utilizador serão carregados dinamicamente apenas após o login.
