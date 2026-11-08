@@ -5,12 +5,12 @@ import string
 import re
 
 import pandas as pd
-import sqlite3
 from flask import Flask, render_template_string, session, redirect, url_for, request
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import text
 
-# Importação dos módulos da CáDoces
+# Importação dos módulos da CáDoces e do motor do Supabase (database.py)
 from routes_receitas import receitas_bp
 from routes_ingredientes import ingredientes_bp
 from routes_clientes import clientes_bp
@@ -21,7 +21,7 @@ from routes_maodeobra import maodeobra_bp
 from routes_suporte import suporte_bp
 from routes_financeira import financeira_bp
 from routes_portfolio import portfolio_bp
-from database import inicializar_bd_aluno
+from database import engine, inicializar_bd_aluno
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'cadoces_segredo_super_importante')
@@ -39,62 +39,26 @@ def verify_password(username, password):
         return username
     return None
 
-DB_PATH = 'cadoces.db'
-
-def inicializar_tabela_utilizadores():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS utilizadores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            tipo TEXT NOT NULL,
-            telemovel TEXT
-        )
-    ''')
-    
-    # Criar tabela de pedidos internos de recuperação de password, caso não exista
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS pedidos_recuperacao (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT NOT NULL,
-            pass_temporaria TEXT NOT NULL,
-            data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            estado TEXT DEFAULT 'Pendente'
-        )
-    ''')
-    
-    # Criar a conta de administração padrão caso a tabela esteja vazia
-    cursor.execute('SELECT COUNT(*) FROM utilizadores WHERE email = ?', ('cadoces023@gmail.com',))
-    if cursor.fetchone()[0] == 0:
-        cursor.execute('''
-            INSERT INTO utilizadores (nome, email, password, tipo, telemovel)
-            VALUES (?, ?, ?, ?, ?)
-        ''', ('Cátia Cardoso', 'cadoces023@gmail.com', generate_password_hash('1234'), 'admin', '351910313162'))
-    
-    conn.commit()
-    conn.close()
-
-# Executar a criação das tabelas no arranque da aplicação
-inicializar_tabela_utilizadores()
+# Executar a inicialização centralizada no Supabase no arranque da aplicação
+with app.app_context():
+    inicializar_bd_aluno()
 
 def obter_utilizador_por_email(email):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM utilizadores WHERE email = ?', (email,))
-    user = cursor.fetchone()
-    conn.close()
-    return user
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT * FROM utilizadores WHERE email = :email"), {"email": email}).mappings().first()
+            return dict(result) if result else None
+    except Exception as e:
+        print(f"Erro ao obter utilizador: {e}")
+        return None
 
 def atualizar_password_bd(email, nova_password_hash):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('UPDATE utilizadores SET password = ? WHERE email = ?', (nova_password_hash, email))
-    conn.commit()
-    conn.close()
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE utilizadores SET password = :password WHERE email = :email"), 
+                         {"password": nova_password_hash, "email": email})
+    except Exception as e:
+        print(f"Erro ao atualizar password: {e}")
 
 def gerar_password_aleatoria():
     minusculas = string.ascii_lowercase
@@ -244,15 +208,12 @@ def recuperar_password():
             nova_pass_temp = gerar_password_aleatoria()
             atualizar_password_bd(email, generate_password_hash(nova_pass_temp))
             
-            # Registar o pedido de recuperação internamente para a administração verificar
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO pedidos_recuperacao (email, pass_temporaria)
-                VALUES (?, ?)
-            ''', (email, nova_pass_temp))
-            conn.commit()
-            conn.close()
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text("INSERT INTO pedidos_recuperacao (email, pass_temporaria) VALUES (:email, :pass)"),
+                                 {"email": email, "pass": nova_pass_temp})
+            except Exception as e:
+                print(f"Erro ao registar pedido de recuperação: {e}")
             
             mensagem = f"O pedido de reposição para <strong>{email}</strong> foi enviado com sucesso para a administração da CáDoces. O administrador irá verificar o seu pedido e fornecer-lhe a nova palavra-passe temporária."
         else:
@@ -314,12 +275,11 @@ def listar_pedidos_recuperacao():
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
         
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM pedidos_recuperacao ORDER BY data_pedido DESC')
-    pedidos = cursor.fetchall()
-    conn.close()
+    try:
+        with engine.connect() as conn:
+            pedidos = conn.execute(text("SELECT * FROM pedidos_recuperacao ORDER BY data_pedido DESC")).mappings().all()
+    except Exception:
+        pedidos = []
     
     linhas = ""
     for p in pedidos:
@@ -384,11 +344,12 @@ def apagar_pedido_recuperacao(pid):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
         
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM pedidos_recuperacao WHERE id = ?', (pid,))
-    conn.commit()
-    conn.close()
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM pedidos_recuperacao WHERE id = :pid"), {"pid": pid})
+    except Exception as e:
+        print(f"Erro ao apagar pedido: {e}")
+        
     return redirect(url_for('listar_pedidos_recuperacao'))
 
 @app.route("/alterar_password", methods=["GET", "POST"])
@@ -535,24 +496,27 @@ def gerir_alunos():
             mensagem = "⚠️ Já existe um utilizador com este email!"
         else:
             password_temporaria = gerar_password_aleatoria()
-            
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO utilizadores (nome, email, password, tipo, telemovel)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (nome, email, generate_password_hash(password_temporaria), 'aluno', telemovel))
-            conn.commit()
-            conn.close()
-            
-            mensagem = f"✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong>"
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        INSERT INTO utilizadores (nome, email, password, tipo, telemovel)
+                        VALUES (:nome, :email, :password, :tipo, :telemovel)
+                    """), {
+                        "nome": nome,
+                        "email": email,
+                        "password": generate_password_hash(password_temporaria),
+                        "tipo": "aluno",
+                        "telemovel": telemovel
+                    })
+                mensagem = f"✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong>"
+            except Exception as e:
+                mensagem = f"⚠️ Erro ao registar aluno: {e}"
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM utilizadores')
-    alunos = cursor.fetchall()
-    conn.close()
+    try:
+        with engine.connect() as conn:
+            alunos = conn.execute(text("SELECT * FROM utilizadores")).mappings().all()
+    except Exception:
+        alunos = []
 
     linhas_alunos = ""
     for u in alunos:
@@ -725,15 +689,20 @@ def editar_aluno(id_idx):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
         
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE utilizadores
-        SET nome = ?, email = ?, telemovel = ?
-        WHERE id = ? AND tipo != 'admin'
-    ''', (request.form.get("nome"), request.form.get("email"), request.form.get("telemovel", "").strip(), id_idx))
-    conn.commit()
-    conn.close()
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE utilizadores
+                SET nome = :nome, email = :email, telemovel = :telemovel
+                WHERE id = :id AND tipo != 'admin'
+            """), {
+                "nome": request.form.get("nome"),
+                "email": request.form.get("email"),
+                "telemovel": request.form.get("telemovel", "").strip(),
+                "id": id_idx
+            })
+    except Exception as e:
+        print(f"Erro ao editar aluno: {e}")
         
     return redirect(url_for('gerir_alunos'))
 
@@ -743,11 +712,11 @@ def apagar_aluno(id_idx):
     if session.get('user_type') != 'admin':
         return "Acesso não autorizado.", 403
         
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM utilizadores WHERE id = ? AND tipo != 'admin'", (id_idx,))
-    conn.commit()
-    conn.close()
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM utilizadores WHERE id = :id AND tipo != 'admin'"), {"id": id_idx})
+    except Exception as e:
+        print(f"Erro ao apagar aluno: {e}")
         
     return redirect(url_for('gerir_alunos'))
 
@@ -831,12 +800,11 @@ def index():
 
     stock_critico = 0
     try:
-        conn = sqlite3.connect('cadoces.db')
-        cursor = conn.execute('SELECT COUNT(*) FROM ingredientes_db WHERE user_email = ? AND (stock <= 0 OR stock_unidades <= 0)', (user_email,))
-        row = cursor.fetchone()
-        if row:
-            stock_critico = row[0]
-        conn.close()
+        table_ing = f"ingredientes_{''.join(c if c.isalnum() else '_' for c in user_email)}"
+        with engine.connect() as conn:
+            row = conn.execute(text(f"SELECT COUNT(*) FROM {table_ing} WHERE stock <= 0 OR stock_unidades <= 0")).scalar()
+            if row:
+                stock_critico = row
     except Exception:
         pass
 
