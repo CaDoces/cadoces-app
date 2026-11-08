@@ -24,7 +24,7 @@ else:
 EXCEL_FILES = [
     'clientes', 'compras', 'custos_fixos', 'despesas',
     'encomendas', 'financeira_dados', 'ingredientes',
-    'lista_compras', 'lista_geral', 'mao_de_obra',
+    * 'lista_compras', 'lista_geral', 'mao_de_obra',
     'maodeobra', 'materiais', 'orçamentos', 'receitas'
 ]
 
@@ -54,7 +54,7 @@ def get_excel_path(filename):
     return df
 
 def inicializar_bd_aluno():
-    """Cria as tabelas globais essenciais e garante o utilizador administrador no arranque."""
+    """Cria as tabelas globais e garante o utilizador administrador no arranque com hash seguro."""
     try:
         with engine.begin() as conn:
             # 1. Cria a tabela de utilizadores
@@ -69,7 +69,7 @@ def inicializar_bd_aluno():
                 );
             """))
 
-            # 2. Cria a tabela de pedidos de recuperação de password
+            # 2. Cria a tabela de recuperação
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS pedidos_recuperacao (
                     id SERIAL PRIMARY KEY,
@@ -80,10 +80,10 @@ def inicializar_bd_aluno():
                 );
             """))
             
-            # Hash exato gerado pelo Werkzeug para a palavra-passe '1234'
-            senha_hash = "scrypt:32768:8:1$kR89WbM8gJ1q7v1q$4b89e3b145a27cf706b4d36ef557f61c39021a8d05541e245a4a52329b35bc5d8b87bfb65a506721528659d8efd7dfd1b092822d64f05ea188b60a3c275927ad"
+            # Gera o hash dinamicamente usando a biblioteca oficial do Werkzeug
+            senha_hash = generate_password_hash("1234")
             
-            # Insere ou atualiza o administrador principal
+            # Insere ou atualiza o administrador principal com o hash fresco
             conn.execute(text("""
                 INSERT INTO utilizadores (nome, email, password, tipo, telemovel) 
                 VALUES (:nome, :email, :password, :tipo, :telemovel)
