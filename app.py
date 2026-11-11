@@ -283,7 +283,7 @@ def recuperar_password():
             <p class="sub">Introduza o email associado à sua conta para submeter um pedido de recuperação interno à administração.</p>
             
             {% if mensagem %}
-                <div class="msg">{{ mensagem | safe }}</div>
+                <div class="msg">{{ mensagem }}</div>
             {% endif %}
             
             {% if erro %}
@@ -318,15 +318,7 @@ def listar_pedidos_recuperacao():
     
     linhas = ""
     for p in pedidos:
-        linhas += (
-            "<tr>"
-            "<td>" + str(p['id']) + "</td>"
-            "<td><strong>" + str(p['email']) + "</strong></td>"
-            "<td><code style=\"background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;\">" + str(p['pass_temporaria']) + "</code></td>"
-            "<td>" + str(p['data_pedido']) + "</td>"
-            "<td><a href=\"/admin/pedidos_recuperacao/apagar/" + str(p['id']) + "\" style=\"color: #c62828; text-decoration: none; font-weight: bold;\">🗑️ Marcar como Resolvido</a></td>"
-            "</tr>"
-        )
+        linhas = linhas + "<tr><td>" + str(p['id']) + "</td><td><strong>" + str(p['email']) + "</strong></td><td><code style=\"background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;\">" + str(p['pass_temporaria']) + "</code></td><td>" + str(p['data_pedido']) + "</td><td><a href=\"/admin/pedidos_recuperacao/apagar/" + str(p['id']) + "\" style=\"color: #c62828; text-decoration: none; font-weight: bold;\">🗑️ Marcar como Resolvido</a></td></tr>"
         
     return render_template_string("""
     <!DOCTYPE html>
@@ -575,7 +567,7 @@ def gerir_alunos():
         tag_perfil = '<span style="background: ' + bg_cor + '; color: ' + txt_cor + '; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">' + tipo_upper + '</span>'
         tel_display = tel_val if tel_val else '<span style="color: #999; font-style: italic;">Não definido</span>'
 
-        linhas_alunos += (
+        linhas_alunos = linhas_alunos + (
             "<tr>"
             "<td data-label=\"Nome\">" + str(u['nome']) + "</td>"
             "<td data-label=\"Email\">" + str(u['email']) + "</td>"
@@ -789,7 +781,7 @@ def index():
                 data_entrega = datetime.datetime.strptime(d_str[:10], '%Y-%m-%d').date()
                 if hoje <= data_entrega <= limite:
                     dias_diff = (data_entrega - hoje).days
-                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else f"Daqui a {dias_diff} dias")
+                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else "Daqui a " + str(dias_diff) + " dias")
                     alertas_urgentes.append({
                         'data': data_entrega.strftime('%d/%m/%Y'),
                         'tempo': tempo_txt,
@@ -807,7 +799,7 @@ def index():
                 data_entrega = datetime.datetime.strptime(d_str[:10], '%Y-%m-%d').date()
                 if hoje <= data_entrega <= limite:
                     dias_diff = (data_entrega - hoje).days
-                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else f"Daqui a {dias_diff} dias")
+                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else "Daqui a " + str(dias_diff) + " dias")
                     alertas_urgentes.append({
                         'data': data_entrega.strftime('%d/%m/%Y'),
                         'tempo': tempo_txt,
@@ -822,53 +814,57 @@ def index():
     if alertas_urgentes:
         itens_alerta_html = ""
         for alt in alertas_urgentes:
-            itens_alerta_html += f"""
-            <div style="background: #fff; border-left: 4px solid #D99B6A; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(74,59,50,0.02); flex-wrap: wrap; gap: 8px;">
-                <div>
-                    <span style="background: #F5EBE0; color: #4A3B32; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-right: 8px;">{alt['tempo']}</span>
-                    <strong>{alt['nome']}</strong> para <em>{alt['cliente']}</em>
-                </div>
-                <div style="font-size: 13px; color: #8C7A6B; font-weight: 600;">
-                    📅 {alt['data']} ({alt['tipo']})
-                </div>
-            </div>
-            """
+            itens_alerta_html = itens_alerta_html + (
+                '<div style="background: #fff; border-left: 4px solid #D99B6A; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(74,59,50,0.02); flex-wrap: wrap; gap: 8px;">'
+                '<div>'
+                '<span style="background: #F5EBE0; color: #4A3B32; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-right: 8px;">' + alt['tempo'] + '</span>'
+                '<strong>' + alt['nome'] + '</strong> para <em>' + alt['cliente'] + '</em>'
+                '</div>'
+                '<div style="font-size: 13px; color: #8C7A6B; font-weight: 600;">'
+                '📅 ' + alt['data'] + ' (' + alt['tipo'] + ')'
+                '</div>'
+                '</div>'
+            )
         
-        html_alertas = f"""
-        <div style="background: #FFFDF9; border: 1.5px solid #EEDCCE; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(74,59,50,0.03);">
-            <h3 style="margin: 0 0 12px 0; color: #4A3B32; font-size: 17px; display: flex; align-items: center; gap: 8px;">
-                🔔 Alertas de Encomendas Próximas (Próximos 3 dias)
-            </h3>
-            {itens_alerta_html}
-        </div>
-        """
+        html_alertas = (
+            '<div style="background: #FFFDF9; border: 1.5px solid #EEDCCE; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(74,59,50,0.03);">'
+            '<h3 style="margin: 0 0 12px 0; color: #4A3B32; font-size: 17px; display: flex; align-items: center; gap: 8px;">'
+            '🔔 Alertas de Encomendas Próximas (Próximos 3 dias)'
+            '</h3>' +
+            itens_alerta_html +
+            '</div>'
+        )
 
     stock_critico = 0
     try:
-        table_ing = f"ingredientes_{''.join(c if c.isalnum() else '_' for c in user_email)}"
+        table_ing = "ingredientes_" + "".join(c if c.isalnum() else "_" for c in user_email)
         with engine.connect() as conn:
-            row = conn.execute(text(f"SELECT COUNT(*) FROM {table_ing} WHERE stock <= 0 OR stock_unidades <= 0")).scalar()
+            row = conn.execute(text("SELECT COUNT(*) FROM " + table_ing + " WHERE stock <= 0 OR stock_unidades <= 0")).scalar()
             if row:
                 stock_critico = row
     except Exception:
         pass
 
-    alerta_stock_html = f"""
-    <div style="background: {'#ffebee' if stock_critico > 0 else '#e8f5e9'}; border: 1px solid {'#ffcdd2' if stock_critico > 0 else '#c8e6c9'}; border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 22px;">{'⚠️' if stock_critico > 0 else '✅'}</span>
-            <div>
-                <strong style="color: {'#c62828' if stock_critico > 0 else '#2e7d32'}; font-size: 14px;">
-                    {'Atenção ao Stock!' if stock_critico > 0 else 'Stock Atualizado!'}
-                </strong>
-                <div style="font-size: 13px; color: #555;">
-                    {'Tens ' + str(stock_critico) + ' ingrediente(s) esgotado(s) ou com stock crítico.' if stock_critico > 0 else 'Todos os teus ingredientes têm stock suficiente.'}
-                </div>
-            </div>
-        </div>
-        {'<a href="/compras" style="background: #c62828; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold;">Ver Lista de Compras</a>' if stock_critico > 0 else ''}
-    </div>
-    """
+    bg_stock = '#ffebee' if stock_critico > 0 else '#e8f5e9'
+    borda_stock = '#ffcdd2' if stock_critico > 0 else '#c8e6c9'
+    icone_stock = '⚠️' if stock_critico > 0 else '✅'
+    titulo_stock = 'Atenção ao Stock!' if stock_critico > 0 else 'Stock Atualizado!'
+    cor_txt_stock = '#c62828' if stock_critico > 0 else '#2e7d32'
+    desc_stock = ('Tens ' + str(stock_critico) + ' ingrediente(s) esgotado(s) ou com stock crítico.') if stock_critico > 0 else 'Todos os teus ingredientes têm stock suficiente.'
+    btn_compras_html = '<a href="/compras" style="background: #c62828; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold;">Ver Lista de Compras</a>' if stock_critico > 0 else ''
+
+    alerta_stock_html = (
+        '<div style="background: ' + bg_stock + '; border: 1px solid ' + borda_stock + '; border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 12px;">'
+        '<div style="display: flex; align-items: center; gap: 12px;">'
+        '<span style="font-size: 22px;">' + icone_stock + '</span>'
+        '<div>'
+        '<strong style="color: ' + cor_txt_stock + '; font-size: 14px;">' + titulo_stock + '</strong>'
+        '<div style="font-size: 13px; color: #555;">' + desc_stock + '</div>'
+        '</div>'
+        '</div>' +
+        btn_compras_html +
+        '</div>'
+    )
 
     return render_template_string("""
     <!DOCTYPE html>

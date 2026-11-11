@@ -1,8 +1,4 @@
-Flask
-Flask-HTTPAuth
-pandas
-openpyxl
-reportlab
-Flask-SQLAlchemy
-psycopg[binary]
-gunicorn
+Flask==3.0.2
+pandas>=2.2.3
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.27
