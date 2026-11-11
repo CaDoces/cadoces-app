@@ -89,7 +89,7 @@ def validar_password_forte(password):
     if not re.search(r"[0-9]", password):
         return "A palavra-passe deve conter pelo menos um número."
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        return "A palavra-passe deve conter pelo menos um caractere especial (ex: !@#$%^&*)."
+        return "A palavra-passe deve conter pelo menos um caractere especial."
     return None
 
 # Registo de todos os Blueprints
@@ -318,7 +318,12 @@ def listar_pedidos_recuperacao():
     
     linhas = ""
     for p in pedidos:
-        linhas = linhas + "<tr><td>" + str(p['id']) + "</td><td><strong>" + str(p['email']) + "</strong></td><td><code style=\"background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;\">" + str(p['pass_temporaria']) + "</code></td><td>" + str(p['data_pedido']) + "</td><td><a href=\"/admin/pedidos_recuperacao/apagar/" + str(p['id']) + "\" style=\"color: #c62828; text-decoration: none; font-weight: bold;\">🗑️ Marcar como Resolvido</a></td></tr>"
+        pid_str = str(p['id'])
+        email_str = str(p['email'])
+        pass_str = str(p['pass_temporaria'])
+        data_str = str(p['data_pedido'])
+        
+        linhas = linhas + "<tr><td>" + pid_str + "</td><td><strong>" + email_str + "</strong></td><td><code style=\"background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;\">" + pass_str + "</code></td><td>" + data_str + "</td><td><a href=\"/admin/pedidos_recuperacao/apagar/" + pid_str + "\" style=\"color: #c62828; text-decoration: none; font-weight: bold;\">🗑️ Marcar como Resolvido</a></td></tr>"
         
     return render_template_string("""
     <!DOCTYPE html>
@@ -411,8 +416,8 @@ def alterar_password():
         else:
             erro = "Utilizador não encontrado."
 
-    msg_html = '<div class="msg" style="background:#e8f5e9; color:#2e7d32; padding:12px; border-radius:8px; margin-bottom:20px; font-weight:bold;">' + mensagem + '</div>' if mensagem else ''
-    err_html = '<div class="error" style="color:#c62828; font-size:13px; text-align:center; margin-bottom:15px; background:#ffebee; padding:8px; border-radius:6px;">' + erro + '</div>' if erro else ''
+    msg_html = '<div class="msg" style="background:#e8f5e9; color:#2e7d32; padding:12px; border-radius:8px; margin-bottom:20px; font-weight:bold;">' + str(mensagem) + '</div>' if mensagem else ''
+    err_html = '<div class="error" style="color:#c62828; font-size:13px; text-align:center; margin-bottom:15px; background:#ffebee; padding:8px; border-radius:6px;">' + str(erro) + '</div>' if erro else ''
 
     return render_template_string("""
     <!DOCTYPE html>
@@ -547,15 +552,15 @@ def gerir_alunos():
 
     linhas_alunos = ""
     for u in alunos:
-        idx = u['id']
+        idx = str(u['id'])
         nome_val = str(u['nome']).replace("'", "\\'")
         email_val = str(u['email']).replace("'", "\\'")
         tel_val = str(u['telemovel'] or '')
         tipo_perfil = str(u['tipo'])
         
         if tipo_perfil != 'admin':
-            btn_editar = '<button type="button" onclick="abrirModalEditarAluno(' + str(idx) + ', \'' + nome_val + '\', \'' + email_val + '\', \'' + tel_val + '\')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>'
-            btn_apagar = '<a href="/admin/alunos/apagar/' + str(idx) + '" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>'
+            btn_editar = '<button type="button" onclick="abrirModalEditarAluno(' + idx + ", '" + nome_val + "', '" + email_val + "', '" + tel_val + "')" + '" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>'
+            btn_apagar = '<a href="/admin/alunos/apagar/' + idx + '" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>'
         else:
             btn_editar = ''
             btn_apagar = '<i>Protegido</i>'
@@ -581,7 +586,7 @@ def gerir_alunos():
             "</tr>"
         )
 
-    msg_html = '<div style="background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c8e6c9;">' + mensagem + '</div>' if mensagem else ''
+    msg_html = '<div style="background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c8e6c9;">' + str(mensagem) + '</div>' if mensagem else ''
 
     return render_template_string("""
     <!DOCTYPE html>
