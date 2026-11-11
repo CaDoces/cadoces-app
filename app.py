@@ -119,7 +119,6 @@ def login():
         
         utilizador = obter_utilizador_por_email(email)
         
-        # Rede de segurança: se o admin não existir no Supabase, cria-o no exato momento
         if not utilizador and email == "cadoces023@gmail.com":
             try:
                 senha_hash = generate_password_hash("1234")
@@ -150,7 +149,6 @@ def login():
         if utilizador:
             stored_pass = str(utilizador['password'])
             
-            # Validação flexível: aceita hash do Werkzeug, texto simples ou aciona o admin automático
             login_valido = False
             if check_password_hash(stored_pass, password):
                 login_valido = True
@@ -252,7 +250,7 @@ def recuperar_password():
             except Exception as e:
                 print(f"Erro ao registar pedido de recuperação: {e}")
             
-            mensagem = f"O pedido de reposição para <strong>{email}</strong> foi enviado com sucesso para a administração da CáDoces. O administrador irá verificar o seu pedido e fornecer-lhe a nova palavra-passe temporária."
+            mensagem = "O pedido de reposição foi enviado com sucesso para a administração da CáDoces."
         else:
             erro = "Email não encontrado na base de dados de utilizadores."
 
@@ -320,15 +318,15 @@ def listar_pedidos_recuperacao():
     
     linhas = ""
     for p in pedidos:
-        linhas += f"""
-        <tr>
-            <td>{p['id']}</td>
-            <td><strong>{p['email']}</strong></td>
-            <td><code style="background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;">{p['pass_temporaria']}</code></td>
-            <td>{p['data_pedido']}</td>
-            <td><a href="/admin/pedidos_recuperacao/apagar/{p['id']}" style="color: #c62828; text-decoration: none; font-weight: bold;">🗑️ Marcar como Resolvido</a></td>
-        </tr>
-        """
+        linhas += (
+            "<tr>"
+            "<td>" + str(p['id']) + "</td>"
+            "<td><strong>" + str(p['email']) + "</strong></td>"
+            "<td><code style=\"background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;\">" + str(p['pass_temporaria']) + "</code></td>"
+            "<td>" + str(p['data_pedido']) + "</td>"
+            "<td><a href=\"/admin/pedidos_recuperacao/apagar/" + str(p['id']) + "\" style=\"color: #c62828; text-decoration: none; font-weight: bold;\">🗑️ Marcar como Resolvido</a></td>"
+            "</tr>"
+        )
         
     return render_template_string("""
     <!DOCTYPE html>
@@ -421,8 +419,8 @@ def alterar_password():
         else:
             erro = "Utilizador não encontrado."
 
-    msg_html = f'<div class="msg" style="background:#e8f5e9; color:#2e7d32; padding:12px; border-radius:8px; margin-bottom:20px; font-weight:bold;">{mensagem}</div>' if mensagem else ''
-    err_html = f'<div class="error" style="color:#c62828; font-size:13px; text-align:center; margin-bottom:15px; background:#ffebee; padding:8px; border-radius:6px;">{erro}</div>' if erro else ''
+    msg_html = '<div class="msg" style="background:#e8f5e9; color:#2e7d32; padding:12px; border-radius:8px; margin-bottom:20px; font-weight:bold;">' + mensagem + '</div>' if mensagem else ''
+    err_html = '<div class="error" style="color:#c62828; font-size:13px; text-align:center; margin-bottom:15px; background:#ffebee; padding:8px; border-radius:6px;">' + erro + '</div>' if erro else ''
 
     return render_template_string("""
     <!DOCTYPE html>
@@ -545,9 +543,9 @@ def gerir_alunos():
                         "tipo": "aluno",
                         "telemovel": telemovel
                     })
-                mensagem = f"✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong>"
+                mensagem = "✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>" + password_temporaria + "</strong>"
             except Exception as e:
-                mensagem = f"⚠️ Erro ao registar aluno: {e}"
+                mensagem = "⚠️ Erro ao registar aluno: " + str(e)
 
     try:
         with engine.connect() as conn:
@@ -563,25 +561,35 @@ def gerir_alunos():
         tel_val = str(u['telemovel'] or '')
         tipo_perfil = str(u['tipo'])
         
-        btn_editar = f'<button type="button" onclick="abrirModalEditarAluno({idx}, \'{nome_val}\', \'{email_val}\', \'{tel_val}\')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>' if tipo_perfil != 'admin' else ''
-        btn_apagar = f'<a href="/admin/alunos/apagar/{idx}" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>' if tipo_perfil != 'admin' else '<i>Protegido</i>'
+        if tipo_perfil != 'admin':
+            btn_editar = '<button type="button" onclick="abrirModalEditarAluno(' + str(idx) + ', \'' + nome_val + '\', \'' + email_val + '\', \'' + tel_val + '\')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>'
+            btn_apagar = '<a href="/admin/alunos/apagar/' + str(idx) + '" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>'
+        else:
+            btn_editar = ''
+            btn_apagar = '<i>Protegido</i>'
 
-        linhas_alunos += f"""
-        <tr>
-            <td data-label="Nome">{u['nome']}</td>
-            <td data-label="Email">{u['email']}</td>
-            <td data-label="Telemóvel">{tel_val if tel_val else '<span style="color: #999; font-style: italic;">Não definido</span>'}</td>
-            <td data-label="Perfil"><span style="background: {'#e8f5e9' if tipo_perfil=='admin' else '#fff3e0'}; color: {'#2e7d32' if tipo_perfil=='admin' else '#b85d19'}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">{tipo_perfil.upper()}</span></td>
-            <td data-label="Ações">
-                <div style="display: flex; align-items: center; gap: 12px; justify-content: flex-end;">
-                    {btn_editar}
-                    {btn_apagar}
-                </div>
-            </td>
-        </tr>
-        """
+        bg_cor = '#e8f5e9' if tipo_perfil == 'admin' else '#fff3e0'
+        txt_cor = '#2e7d32' if tipo_perfil == 'admin' else '#b85d19'
+        tipo_upper = tipo_perfil.upper()
+        
+        tag_perfil = '<span style="background: ' + bg_cor + '; color: ' + txt_cor + '; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">' + tipo_upper + '</span>'
+        tel_display = tel_val if tel_val else '<span style="color: #999; font-style: italic;">Não definido</span>'
 
-    msg_html = f'<div style="background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c8e6c9;">{mensagem}</div>' if mensagem else ''
+        linhas_alunos += (
+            "<tr>"
+            "<td data-label=\"Nome\">" + str(u['nome']) + "</td>"
+            "<td data-label=\"Email\">" + str(u['email']) + "</td>"
+            "<td data-label=\"Telemóvel\">" + tel_display + "</td>"
+            "<td data-label=\"Perfil\">" + tag_perfil + "</td>"
+            "<td data-label=\"Ações\">"
+            "<div style=\"display: flex; align-items: center; gap: 12px; justify-content: flex-end;\">" +
+            btn_editar + btn_apagar +
+            "</div>"
+            "</td>"
+            "</tr>"
+        )
+
+    msg_html = '<div style="background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c8e6c9;">' + mensagem + '</div>' if mensagem else ''
 
     return render_template_string("""
     <!DOCTYPE html>
