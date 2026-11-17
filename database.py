@@ -8,7 +8,9 @@ from werkzeug.security import generate_password_hash
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 # Garante que o sslmode=require está presente para conexões seguras
 if DATABASE_URL and "sslmode=" not in DATABASE_URL:

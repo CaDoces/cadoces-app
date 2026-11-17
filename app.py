@@ -89,7 +89,7 @@ def validar_password_forte(password):
     if not re.search(r"[0-9]", password):
         return "A palavra-passe deve conter pelo menos um número."
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        return "A palavra-passe deve conter pelo menos um caractere especial (ex: !@#$%^&*)."
+        return "A palavra-passe deve conter pelo menos um caractere especial."
     return None
 
 # Registo de todos os Blueprints
@@ -119,7 +119,6 @@ def login():
         
         utilizador = obter_utilizador_por_email(email)
         
-        # Rede de segurança: se o admin não existir no Supabase, cria-o no exato momento
         if not utilizador and email == "cadoces023@gmail.com":
             try:
                 senha_hash = generate_password_hash("1234")
@@ -150,7 +149,6 @@ def login():
         if utilizador:
             stored_pass = str(utilizador['password'])
             
-            # Validação flexível: aceita hash do Werkzeug, texto simples ou aciona o admin automático
             login_valido = False
             if check_password_hash(stored_pass, password):
                 login_valido = True
@@ -252,7 +250,7 @@ def recuperar_password():
             except Exception as e:
                 print(f"Erro ao registar pedido de recuperação: {e}")
             
-            mensagem = f"O pedido de reposição para <strong>{email}</strong> foi enviado com sucesso para a administração da CáDoces. O administrador irá verificar o seu pedido e fornecer-lhe a nova palavra-passe temporária."
+            mensagem = "O pedido de reposição foi enviado com sucesso para a administração da CáDoces."
         else:
             erro = "Email não encontrado na base de dados de utilizadores."
 
@@ -285,7 +283,7 @@ def recuperar_password():
             <p class="sub">Introduza o email associado à sua conta para submeter um pedido de recuperação interno à administração.</p>
             
             {% if mensagem %}
-                <div class="msg">{{ mensagem | safe }}</div>
+                <div class="msg">{{ mensagem }}</div>
             {% endif %}
             
             {% if erro %}
@@ -320,15 +318,12 @@ def listar_pedidos_recuperacao():
     
     linhas = ""
     for p in pedidos:
-        linhas += f"""
-        <tr>
-            <td>{p['id']}</td>
-            <td><strong>{p['email']}</strong></td>
-            <td><code style="background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;">{p['pass_temporaria']}</code></td>
-            <td>{p['data_pedido']}</td>
-            <td><a href="/admin/pedidos_recuperacao/apagar/{p['id']}" style="color: #c62828; text-decoration: none; font-weight: bold;">🗑️ Marcar como Resolvido</a></td>
-        </tr>
-        """
+        pid_str = str(p['id'])
+        email_str = str(p['email'])
+        pass_str = str(p['pass_temporaria'])
+        data_str = str(p['data_pedido'])
+        
+        linhas = linhas + "<tr><td>" + pid_str + "</td><td><strong>" + email_str + "</strong></td><td><code style=\"background: #f9f0e6; color: #b85d19; padding: 4px 8px; border-radius: 4px; font-size: 15px; font-weight: bold;\">" + pass_str + "</code></td><td>" + data_str + "</td><td><a href=\"/admin/pedidos_recuperacao/apagar/" + pid_str + "\" style=\"color: #c62828; text-decoration: none; font-weight: bold;\">🗑️ Marcar como Resolvido</a></td></tr>"
         
     return render_template_string("""
     <!DOCTYPE html>
@@ -421,8 +416,8 @@ def alterar_password():
         else:
             erro = "Utilizador não encontrado."
 
-    msg_html = f'<div class="msg" style="background:#e8f5e9; color:#2e7d32; padding:12px; border-radius:8px; margin-bottom:20px; font-weight:bold;">{mensagem}</div>' if mensagem else ''
-    err_html = f'<div class="error" style="color:#c62828; font-size:13px; text-align:center; margin-bottom:15px; background:#ffebee; padding:8px; border-radius:6px;">{erro}</div>' if erro else ''
+    msg_html = '<div class="msg" style="background:#e8f5e9; color:#2e7d32; padding:12px; border-radius:8px; margin-bottom:20px; font-weight:bold;">' + str(mensagem) + '</div>' if mensagem else ''
+    err_html = '<div class="error" style="color:#c62828; font-size:13px; text-align:center; margin-bottom:15px; background:#ffebee; padding:8px; border-radius:6px;">' + str(erro) + '</div>' if erro else ''
 
     return render_template_string("""
     <!DOCTYPE html>
@@ -545,9 +540,9 @@ def gerir_alunos():
                         "tipo": "aluno",
                         "telemovel": telemovel
                     })
-                mensagem = f"✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>{password_temporaria}</strong>"
+                mensagem = "✅ Aluno registado com sucesso! Palavra-passe temporária gerada: <strong>" + password_temporaria + "</strong>"
             except Exception as e:
-                mensagem = f"⚠️ Erro ao registar aluno: {e}"
+                mensagem = "⚠️ Erro ao registar aluno: " + str(e)
 
     try:
         with engine.connect() as conn:
@@ -557,31 +552,41 @@ def gerir_alunos():
 
     linhas_alunos = ""
     for u in alunos:
-        idx = u['id']
+        idx = str(u['id'])
         nome_val = str(u['nome']).replace("'", "\\'")
         email_val = str(u['email']).replace("'", "\\'")
         tel_val = str(u['telemovel'] or '')
         tipo_perfil = str(u['tipo'])
         
-        btn_editar = f'<button type="button" onclick="abrirModalEditarAluno({idx}, \'{nome_val}\', \'{email_val}\', \'{tel_val}\')" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>' if tipo_perfil != 'admin' else ''
-        btn_apagar = f'<a href="/admin/alunos/apagar/{idx}" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>' if tipo_perfil != 'admin' else '<i>Protegido</i>'
+        if tipo_perfil != 'admin':
+            btn_editar = '<button type="button" onclick="abrirModalEditarAluno(' + idx + ", '" + nome_val + "', '" + email_val + "', '" + tel_val + "')" + '" style="background: none; border: none; cursor: pointer; font-size: 16px;" title="Editar">✏️</button>'
+            btn_apagar = '<a href="/admin/alunos/apagar/' + idx + '" onclick="return confirm(\'Remover o acesso deste aluno?\')" style="color: #c62828; text-decoration: none; font-size: 16px;" title="Apagar Acesso">🗑️</a>'
+        else:
+            btn_editar = ''
+            btn_apagar = '<i>Protegido</i>'
 
-        linhas_alunos += f"""
-        <tr>
-            <td data-label="Nome">{u['nome']}</td>
-            <td data-label="Email">{u['email']}</td>
-            <td data-label="Telemóvel">{tel_val if tel_val else '<span style="color: #999; font-style: italic;">Não definido</span>'}</td>
-            <td data-label="Perfil"><span style="background: {'#e8f5e9' if tipo_perfil=='admin' else '#fff3e0'}; color: {'#2e7d32' if tipo_perfil=='admin' else '#b85d19'}; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">{tipo_perfil.upper()}</span></td>
-            <td data-label="Ações">
-                <div style="display: flex; align-items: center; gap: 12px; justify-content: flex-end;">
-                    {btn_editar}
-                    {btn_apagar}
-                </div>
-            </td>
-        </tr>
-        """
+        bg_cor = '#e8f5e9' if tipo_perfil == 'admin' else '#fff3e0'
+        txt_cor = '#2e7d32' if tipo_perfil == 'admin' else '#b85d19'
+        tipo_upper = tipo_perfil.upper()
+        
+        tag_perfil = '<span style="background: ' + bg_cor + '; color: ' + txt_cor + '; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">' + tipo_upper + '</span>'
+        tel_display = tel_val if tel_val else '<span style="color: #999; font-style: italic;">Não definido</span>'
 
-    msg_html = f'<div style="background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c8e6c9;">{mensagem}</div>' if mensagem else ''
+        linhas_alunos = linhas_alunos + (
+            "<tr>"
+            "<td data-label=\"Nome\">" + str(u['nome']) + "</td>"
+            "<td data-label=\"Email\">" + str(u['email']) + "</td>"
+            "<td data-label=\"Telemóvel\">" + tel_display + "</td>"
+            "<td data-label=\"Perfil\">" + tag_perfil + "</td>"
+            "<td data-label=\"Ações\">"
+            "<div style=\"display: flex; align-items: center; gap: 12px; justify-content: flex-end;\">" +
+            btn_editar + btn_apagar +
+            "</div>"
+            "</td>"
+            "</tr>"
+        )
+
+    msg_html = '<div style="background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; border: 1px solid #c8e6c9;">' + str(mensagem) + '</div>' if mensagem else ''
 
     return render_template_string("""
     <!DOCTYPE html>
@@ -781,7 +786,7 @@ def index():
                 data_entrega = datetime.datetime.strptime(d_str[:10], '%Y-%m-%d').date()
                 if hoje <= data_entrega <= limite:
                     dias_diff = (data_entrega - hoje).days
-                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else f"Daqui a {dias_diff} dias")
+                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else "Daqui a " + str(dias_diff) + " dias")
                     alertas_urgentes.append({
                         'data': data_entrega.strftime('%d/%m/%Y'),
                         'tempo': tempo_txt,
@@ -799,7 +804,7 @@ def index():
                 data_entrega = datetime.datetime.strptime(d_str[:10], '%Y-%m-%d').date()
                 if hoje <= data_entrega <= limite:
                     dias_diff = (data_entrega - hoje).days
-                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else f"Daqui a {dias_diff} dias")
+                    tempo_txt = "Hoje!" if dias_diff == 0 else ("Amanhã!" if dias_diff == 1 else "Daqui a " + str(dias_diff) + " dias")
                     alertas_urgentes.append({
                         'data': data_entrega.strftime('%d/%m/%Y'),
                         'tempo': tempo_txt,
@@ -814,53 +819,57 @@ def index():
     if alertas_urgentes:
         itens_alerta_html = ""
         for alt in alertas_urgentes:
-            itens_alerta_html += f"""
-            <div style="background: #fff; border-left: 4px solid #D99B6A; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(74,59,50,0.02); flex-wrap: wrap; gap: 8px;">
-                <div>
-                    <span style="background: #F5EBE0; color: #4A3B32; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-right: 8px;">{alt['tempo']}</span>
-                    <strong>{alt['nome']}</strong> para <em>{alt['cliente']}</em>
-                </div>
-                <div style="font-size: 13px; color: #8C7A6B; font-weight: 600;">
-                    📅 {alt['data']} ({alt['tipo']})
-                </div>
-            </div>
-            """
+            itens_alerta_html = itens_alerta_html + (
+                '<div style="background: #fff; border-left: 4px solid #D99B6A; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(74,59,50,0.02); flex-wrap: wrap; gap: 8px;">'
+                '<div>'
+                '<span style="background: #F5EBE0; color: #4A3B32; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; margin-right: 8px;">' + alt['tempo'] + '</span>'
+                '<strong>' + alt['nome'] + '</strong> para <em>' + alt['cliente'] + '</em>'
+                '</div>'
+                '<div style="font-size: 13px; color: #8C7A6B; font-weight: 600;">'
+                '📅 ' + alt['data'] + ' (' + alt['tipo'] + ')'
+                '</div>'
+                '</div>'
+            )
         
-        html_alertas = f"""
-        <div style="background: #FFFDF9; border: 1.5px solid #EEDCCE; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(74,59,50,0.03);">
-            <h3 style="margin: 0 0 12px 0; color: #4A3B32; font-size: 17px; display: flex; align-items: center; gap: 8px;">
-                🔔 Alertas de Encomendas Próximas (Próximos 3 dias)
-            </h3>
-            {itens_alerta_html}
-        </div>
-        """
+        html_alertas = (
+            '<div style="background: #FFFDF9; border: 1.5px solid #EEDCCE; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(74,59,50,0.03);">'
+            '<h3 style="margin: 0 0 12px 0; color: #4A3B32; font-size: 17px; display: flex; align-items: center; gap: 8px;">'
+            '🔔 Alertas de Encomendas Próximas (Próximos 3 dias)'
+            '</h3>' +
+            itens_alerta_html +
+            '</div>'
+        )
 
     stock_critico = 0
     try:
-        table_ing = f"ingredientes_{''.join(c if c.isalnum() else '_' for c in user_email)}"
+        table_ing = "ingredientes_" + "".join(c if c.isalnum() else "_" for c in user_email)
         with engine.connect() as conn:
-            row = conn.execute(text(f"SELECT COUNT(*) FROM {table_ing} WHERE stock <= 0 OR stock_unidades <= 0")).scalar()
+            row = conn.execute(text("SELECT COUNT(*) FROM " + table_ing + " WHERE stock <= 0 OR stock_unidades <= 0")).scalar()
             if row:
                 stock_critico = row
     except Exception:
         pass
 
-    alerta_stock_html = f"""
-    <div style="background: {'#ffebee' if stock_critico > 0 else '#e8f5e9'}; border: 1px solid {'#ffcdd2' if stock_critico > 0 else '#c8e6c9'}; border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 22px;">{'⚠️' if stock_critico > 0 else '✅'}</span>
-            <div>
-                <strong style="color: {'#c62828' if stock_critico > 0 else '#2e7d32'}; font-size: 14px;">
-                    {'Atenção ao Stock!' if stock_critico > 0 else 'Stock Atualizado!'}
-                </strong>
-                <div style="font-size: 13px; color: #555;">
-                    {'Tens ' + str(stock_critico) + ' ingrediente(s) esgotado(s) ou com stock crítico.' if stock_critico > 0 else 'Todos os teus ingredientes têm stock suficiente.'}
-                </div>
-            </div>
-        </div>
-        {'<a href="/compras" style="background: #c62828; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold;">Ver Lista de Compras</a>' if stock_critico > 0 else ''}
-    </div>
-    """
+    bg_stock = '#ffebee' if stock_critico > 0 else '#e8f5e9'
+    borda_stock = '#ffcdd2' if stock_critico > 0 else '#c8e6c9'
+    icone_stock = '⚠️' if stock_critico > 0 else '✅'
+    titulo_stock = 'Atenção ao Stock!' if stock_critico > 0 else 'Stock Atualizado!'
+    cor_txt_stock = '#c62828' if stock_critico > 0 else '#2e7d32'
+    desc_stock = ('Tens ' + str(stock_critico) + ' ingrediente(s) esgotado(s) ou com stock crítico.') if stock_critico > 0 else 'Todos os teus ingredientes têm stock suficiente.'
+    btn_compras_html = '<a href="/compras" style="background: #c62828; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: bold;">Ver Lista de Compras</a>' if stock_critico > 0 else ''
+
+    alerta_stock_html = (
+        '<div style="background: ' + bg_stock + '; border: 1px solid ' + borda_stock + '; border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 12px;">'
+        '<div style="display: flex; align-items: center; gap: 12px;">'
+        '<span style="font-size: 22px;">' + icone_stock + '</span>'
+        '<div>'
+        '<strong style="color: ' + cor_txt_stock + '; font-size: 14px;">' + titulo_stock + '</strong>'
+        '<div style="font-size: 13px; color: #555;">' + desc_stock + '</div>'
+        '</div>'
+        '</div>' +
+        btn_compras_html +
+        '</div>'
+    )
 
     return render_template_string("""
     <!DOCTYPE html>
