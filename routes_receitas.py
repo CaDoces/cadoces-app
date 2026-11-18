@@ -170,6 +170,18 @@ HTML_TEMPLATE = """
                 optionsHtml += `<option value="${ing}" ${selected}>${ing}</option>`;
             }
 
+            const unidadesOpcoes = [
+                "Gramas (g)", "Quilogramas (kg)", "Mililitros (ml)", 
+                "Litros (l)", "Unidades (un)", "Colheres de Sopa", 
+                "Colheres de Chá", "Chávenas", "Pitada"
+            ];
+
+            let unidadeOptionsHtml = '<option value="" disabled ' + (!unidadeVal ? 'selected' : '') + '>Selecionar unidade...</option>';
+            unidadesOpcoes.forEach(u => {
+                let sel = (u === unidadeVal) ? 'selected' : '';
+                unidadeOptionsHtml += `<option value="${u}" ${sel}>${u}</option>`;
+            });
+
             row.innerHTML = `
                 <div style="margin-bottom: 8px;">
                     <select name="ingrediente[]" class="form-control" onchange="recalcularCustoTotal()" required>
@@ -178,7 +190,9 @@ HTML_TEMPLATE = """
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" oninput="recalcularCustoTotal()" style="flex: 1;" required>
-                    <input type="text" name="unidade[]" class="form-control" placeholder="Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
+                    <select name="unidade[]" class="form-control" style="flex: 1.2;" required>
+                        ${unidadeOptionsHtml}
+                    </select>
                     <button type="button" onclick="this.closest('.ingrediente-row').remove(); recalcularCustoTotal();" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
                 </div>
             `;
@@ -332,6 +346,18 @@ EDITAR_TEMPLATE = """
                 optionsHtml += `<option value="${ing}" ${selected}>${ing}</option>`;
             }
 
+            const unidadesOpcoes = [
+                "Gramas (g)", "Quilogramas (kg)", "Mililitros (ml)", 
+                "Litros (l)", "Unidades (un)", "Colheres de Sopa", 
+                "Colheres de Chá", "Chávenas", "Pitada"
+            ];
+
+            let unidadeOptionsHtml = '<option value="" disabled ' + (!unidadeVal ? 'selected' : '') + '>Selecionar unidade...</option>';
+            unidadesOpcoes.forEach(u => {
+                let sel = (u === unidadeVal) ? 'selected' : '';
+                unidadeOptionsHtml += `<option value="${u}" ${sel}>${u}</option>`;
+            });
+
             row.innerHTML = `
                 <div style="margin-bottom: 8px;">
                     <select name="ingrediente[]" class="form-control" required>
@@ -340,7 +366,9 @@ EDITAR_TEMPLATE = """
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" style="flex: 1;" required>
-                    <input type="text" name="unidade[]" class="form-control" placeholder="Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
+                    <select name="unidade[]" class="form-control" style="flex: 1.2;" required>
+                        ${unidadeOptionsHtml}
+                    </select>
                     <button type="button" onclick="this.closest('.ingrediente-row').remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
                 </div>
             `;
