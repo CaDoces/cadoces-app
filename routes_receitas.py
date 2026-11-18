@@ -137,7 +137,7 @@ HTML_TEMPLATE = """
         .action-btn.delete:hover { color: #C0392B; }
         
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(74,59,50,0.4); overflow-y: auto; padding: 40px 0; }
-        .modal-content { background-color: #FFFFFF; margin: auto; padding: 30px; border: 1px solid #EEDCCE; width: 600px; max-width: 90%; border-radius: 14px; box-shadow: 0 8px 24px rgba(74,59,50,0.1); position: relative; box-sizing: border-box; }
+        .modal-content { background-color: #FFFFFF; margin: auto; padding: 30px; border: 1px solid #EEDCCE; width: 650px; max-width: 90%; border-radius: 14px; box-shadow: 0 8px 24px rgba(74,59,50,0.1); position: relative; box-sizing: border-box; }
         .close-btn { position: absolute; right: 20px; top: 20px; font-size: 20px; cursor: pointer; color: #8C7A6B; font-weight: bold; background: #F5EBE0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid #EEDCCE; }
         .form-group { margin-bottom: 18px; }
         .form-group label { display: block; font-size: 12px; margin-bottom: 6px; color: #734D2E; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -151,26 +151,49 @@ HTML_TEMPLATE = """
 
         function abrirModalReceita() {
             document.getElementById('modalReceita').style.display = 'block';
+            recalcularCustoTotal();
         }
         function fecharModalReceita() {
             document.getElementById('modalReceita').style.display = 'none';
         }
 
-        function atualizarUnidade(selectElement) {
+        function atualizarUnidadeESelector(selectElement) {
             const nomeIngrediente = selectElement.value;
-            const containerLinha = selectElement.parentElement;
-            const spanUnidade = containerLinha.querySelector('.unidade-label');
+            const linha = selectElement.closest('.ingrediente-row');
+            const spanUnidade = linha.querySelector('.unidade-label');
             if (dadosIngredientes[nomeIngrediente]) {
                 spanUnidade.textContent = dadosIngredientes[nomeIngrediente].unidade;
             } else {
                 spanUnidade.textContent = '';
+            }
+            recalcularCustoTotal();
+        }
+
+        function recalcularCustoTotal() {
+            let custoTotal = 0;
+            const linhas = document.querySelectorAll('#ingredientesContainer .ingrediente-row');
+            linhas.forEach(linha => {
+                const select = linha.querySelector('select[name="ingrediente[]"]');
+                const qtdInput = linha.querySelector('input[name="quantidade[]"]');
+                if (select && qtdInput) {
+                    const ingNome = select.value;
+                    const qtd = parseFloat(qtdInput.value) || 0;
+                    if (ingNome && dadosIngredientes[ingNome]) {
+                        custoTotal += dadosIngredientes[ingNome].custo_unitario * qtd;
+                    }
+                }
+            });
+            const spanCusto = document.getElementById('custoTotalVisual');
+            if (spanCusto) {
+                spanCusto.textContent = '€' + custoTotal.toFixed(2);
             }
         }
 
         function adicionarLinhaIngrediente(containerId = 'ingredientesContainer', ingredienteVal = '', qtdVal = '') {
             const container = document.getElementById(containerId);
             const row = document.createElement('div');
-            row.style.cssText = "display: flex; gap: 10px; margin-bottom: 10px; align-items: center;";
+            row.className = "ingrediente-row";
+            row.style.cssText = "background: #FAF8F5; border: 1px solid #EEDCCE; border-radius: 10px; padding: 12px; margin-bottom: 12px;";
             
             let optionsHtml = '<option value="" disabled ' + (!ingredienteVal ? 'selected' : '') + '>Selecionar ingrediente...</option>';
             for (const [ing, info] of Object.entries(dadosIngredientes)) {
@@ -184,14 +207,19 @@ HTML_TEMPLATE = """
             }
 
             row.innerHTML = `
-                <select name="ingrediente[]" class="form-control" style="flex: 2;" onchange="atualizarUnidade(this)" required>
-                    ${optionsHtml}
-                </select>
-                <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="Qtd" value="${qtdVal}" style="flex: 1;" required>
-                <span class="unidade-label" style="font-size: 13px; font-weight: 600; color: #734D2E; min-width: 40px; text-align: center;">${unidadeInicial}</span>
-                <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
+                <div style="margin-bottom: 8px;">
+                    <select name="ingrediente[]" class="form-control" onchange="atualizarUnidadeESelector(this)" required>
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" oninput="recalcularCustoTotal()" style="flex: 1;" required>
+                    <span class="unidade-label" style="font-size: 13px; font-weight: 600; color: #734D2E; min-width: 80px;">${unidadeInicial}</span>
+                    <button type="button" onclick="this.closest('.ingrediente-row').remove(); recalcularCustoTotal();" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
+                </div>
             `;
             container.appendChild(row);
+            recalcularCustoTotal();
         }
 
         function adicionarLinhaMaoObra(containerId = 'maoObraContainer', tarefaVal = '') {
@@ -254,7 +282,7 @@ HTML_TEMPLATE = """
 <div id="modalReceita" class="modal">
     <div class="modal-content">
         <span class="close-btn" onclick="fecharModalReceita()">&times;</span>
-        <h2 style="margin-top:0; color:#2C1E1A; font-size:20px;">Adicionar Nova Receita</h2>
+        <h2 style="margin-top:0; color:#2C1E1A; font-size:20px;">Criar Receita</h2>
         
         <form action="{{ url_for('receitas_bp.adicionar_receita') }}" method="POST">
             <div class="form-group">
@@ -277,8 +305,8 @@ HTML_TEMPLATE = """
             
             <div class="form-group">
                 <label style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Ingredientes Necessários</span>
-                    <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline" style="padding: 4px 10px; font-size: 12px;">+ Adicionar Ingrediente</button>
+                    <span>Ingredientes</span>
+                    <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline" style="padding: 4px 10px; font-size: 12px;">+ Adicionar</button>
                 </label>
                 <div id="ingredientesContainer" style="margin-top: 8px;"></div>
             </div>
@@ -289,21 +317,25 @@ HTML_TEMPLATE = """
                     <button type="button" onclick="adicionarLinhaMaoObra('maoObraContainer')" class="btn-outline" style="padding: 4px 10px; font-size: 12px;">+ Adicionar Tarefa</button>
                 </label>
                 <div id="maoObraContainer" style="margin-top: 8px;"></div>
-                <small style="color: #8C7A6B;">As tarefas baseiam-se nos tempos definidos no módulo de Mão de Obra.</small>
             </div>
 
             <div class="form-group">
                 <label>Modo de Preparação</label>
-                <textarea name="preparacao" class="form-control" rows="3" placeholder="Passo a passo..."></textarea>
+                <textarea name="preparacao" class="form-control" rows="3" placeholder="Passo a passo de como preparar a receita..."></textarea>
             </div>
             <div class="form-group">
-                <label>Notas</label>
-                <textarea name="notas" class="form-control" rows="2" placeholder="Notas adicionais..."></textarea>
+                <label>Notas Adicionais (opcional)</label>
+                <textarea name="notas" class="form-control" rows="2" placeholder="Dicas, variações, observações..."></textarea>
+            </div>
+
+            <div style="background: #F5EBE0; border: 1px solid #EEDCCE; border-radius: 10px; padding: 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <span style="font-weight: 600; color: #734D2E;">Custo Total:</span>
+                <span id="custoTotalVisual" style="font-size: 22px; font-weight: bold; color: #D99B6A;">€0.00</span>
             </div>
 
             <div class="modal-footer">
                 <button type="button" class="btn-outline" onclick="fecharModalReceita()">Cancelar</button>
-                <button type="submit" class="btn-primary">Guardar Receita</button>
+                <button type="submit" class="btn-primary">Criar Receita</button>
             </div>
         </form>
     </div>
@@ -348,10 +380,10 @@ EDITAR_TEMPLATE = """
         const dadosIngredientes = {{ custos_js | safe }};
         const tarefasMaoObra = {{ tarefas_mao_obra_js | safe }};
 
-        function atualizarUnidade(selectElement) {
+        function atualizarUnidadeESelector(selectElement) {
             const nomeIngrediente = selectElement.value;
-            const containerLinha = selectElement.parentElement;
-            const spanUnidade = containerLinha.querySelector('.unidade-label');
+            const linha = selectElement.closest('.ingrediente-row');
+            const spanUnidade = linha.querySelector('.unidade-label');
             if (dadosIngredientes[nomeIngrediente]) {
                 spanUnidade.textContent = dadosIngredientes[nomeIngrediente].unidade;
             } else {
@@ -362,7 +394,8 @@ EDITAR_TEMPLATE = """
         function adicionarLinhaIngrediente(containerId = 'ingredientesContainer', ingredienteVal = '', qtdVal = '') {
             const container = document.getElementById(containerId);
             const row = document.createElement('div');
-            row.style.cssText = "display: flex; gap: 10px; margin-bottom: 10px; align-items: center;";
+            row.className = "ingrediente-row";
+            row.style.cssText = "background: #FAF8F5; border: 1px solid #EEDCCE; border-radius: 10px; padding: 12px; margin-bottom: 12px;";
             
             let optionsHtml = '<option value="" disabled ' + (!ingredienteVal ? 'selected' : '') + '>Selecionar ingrediente...</option>';
             for (const [ing, info] of Object.entries(dadosIngredientes)) {
@@ -376,12 +409,16 @@ EDITAR_TEMPLATE = """
             }
 
             row.innerHTML = `
-                <select name="ingrediente[]" class="form-control" style="flex: 2;" onchange="atualizarUnidade(this)" required>
-                    ${optionsHtml}
-                </select>
-                <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="Qtd" value="${qtdVal}" style="flex: 1;" required>
-                <span class="unidade-label" style="font-size: 13px; font-weight: 600; color: #734D2E; min-width: 40px; text-align: center;">${unidadeInicial}</span>
-                <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
+                <div style="margin-bottom: 8px;">
+                    <select name="ingrediente[]" class="form-control" onchange="atualizarUnidadeESelector(this)" required>
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" style="flex: 1;" required>
+                    <span class="unidade-label" style="font-size: 13px; font-weight: 600; color: #734D2E; min-width: 80px;">${unidadeInicial}</span>
+                    <button type="button" onclick="this.closest('.ingrediente-row').remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
+                </div>
             `;
             container.appendChild(row);
         }
@@ -438,8 +475,8 @@ EDITAR_TEMPLATE = """
             
             <div class="form-group">
                 <label style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Ingredientes Necessários</span>
-                    <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline">+ Adicionar Ingrediente</button>
+                    <span>Ingredientes</span>
+                    <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline">+ Adicionar</button>
                 </label>
                 <div id="ingredientesContainer" style="margin-top: 8px;"></div>
             </div>
@@ -457,7 +494,7 @@ EDITAR_TEMPLATE = """
                 <textarea name="preparacao" class="form-control" rows="4">{{ receita.preparacao or '' }}</textarea>
             </div>
             <div class="form-group">
-                <label>Notas</label>
+                <label>Notas Adicionais</label>
                 <textarea name="notas" class="form-control" rows="2">{{ receita.notas or '' }}</textarea>
             </div>
 

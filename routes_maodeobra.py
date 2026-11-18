@@ -119,7 +119,7 @@ def gerir_mao_obra():
             table.table-custom td {{ padding: 16px 12px; border-bottom: 1px solid #F5EBE0; color: #4A3B32; font-size: 14px; }}
             
             .modal {{ display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(74,59,50,0.4); overflow-y: auto; padding: 40px 0; }}
-            .modal-content {{ background-color: #FFFFFF; margin: auto; padding: 30px; border: 1px solid #EEDCCE; width: 450px; max-width: 90%; border-radius: 14px; box-shadow: 0 8px 24px rgba(74,59,50,0.1); position: relative; box-sizing: border-box; }}
+            .modal-content {{ background-color: #FFFFFF; margin: auto; padding: 30px; border: 1px solid #EEDCCE; width: 480px; max-width: 90%; border-radius: 14px; box-shadow: 0 8px 24px rgba(74,59,50,0.1); position: relative; box-sizing: border-box; }}
             .close-btn {{ position: absolute; right: 20px; top: 20px; font-size: 20px; cursor: pointer; color: #8C7A6B; font-weight: bold; background: #F5EBE0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid #EEDCCE; }}
             .form-group {{ margin-bottom: 18px; }}
             .form-group label {{ display: block; font-weight: 600; color: #734D2E; margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }}
@@ -130,45 +130,6 @@ def gerir_mao_obra():
             
             .back-link {{ display: inline-block; margin-bottom: 15px; color: #D99B6A; text-decoration: none; font-weight: 600; font-size: 14px; }}
             .back-link:hover {{ text-decoration: underline; }}
-
-            @media screen and (max-width: 768px) {{
-                body {{ padding: 15px; }}
-                .cards-grid {{ grid-template-columns: 1fr; gap: 15px; }}
-                table.table-custom, table.table-custom thead, table.table-custom tbody, table.table-custom th, table.table-custom td, table.table-custom tr {{
-                    display: block;
-                }}
-                table.table-custom thead tr {{
-                    position: absolute;
-                    top: -9999px;
-                    left: -9999px;
-                }}
-                table.table-custom tr {{
-                    background: #FFFFFF;
-                    border: 1px solid #EEDCCE;
-                    border-radius: 12px;
-                    margin-bottom: 15px;
-                    padding: 15px;
-                }}
-                table.table-custom td {{
-                    border: none !important;
-                    position: relative;
-                    padding-left: 45% !important;
-                    text-align: right;
-                    padding-top: 8px;
-                    padding-bottom: 8px;
-                }}
-                table.table-custom td::before {{
-                    position: absolute;
-                    left: 15px;
-                    width: 40%;
-                    padding-right: 10px;
-                    white-space: nowrap;
-                    text-align: left;
-                    font-weight: 600;
-                    color: #734D2E;
-                    content: attr(data-label);
-                }}
-            }}
         </style>
     </head>
     <body>
@@ -207,7 +168,7 @@ def gerir_mao_obra():
                     <thead>
                         <tr>
                             <th>Tarefa</th>
-                            <th>Tempo</th>
+                            <th>Tempo Total (minutos)</th>
                             <th>Custo</th>
                             <th style="text-align: right;">Ações</th>
                         </tr>
@@ -228,18 +189,25 @@ def gerir_mao_obra():
                     <input type="hidden" name="id" id="tarefaId">
                     
                     <div class="form-group">
-                        <label>Nome da Tarefa / Sub-tarefa *</label>
-                        <input type="text" name="tarefa" id="tarefaNome" class="form-control" placeholder="Ex: Bater massa, Decorar, Cozer" required>
+                        <label>Nome da Tarefa</label>
+                        <input type="text" name="tarefa" id="tarefaNome" class="form-control" placeholder="Ex: Decoração com fondant" required>
                     </div>
 
                     <div class="form-group">
-                        <label>Tempo em Minutos</label>
-                        <input type="number" step="1" name="tempo" id="tarefaTempo" class="form-control" placeholder="Ex: 15" required>
+                        <label>Tempo Total (minutos)</label>
+                        <input type="number" step="1" name="tempo" id="tarefaTempo" class="form-control" placeholder="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Sub-tarefas (opcional)</span>
+                            <button type="button" class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="alert('Funcionalidade de sub-tarefas em desenvolvimento')">+ Adicionar Etapa</button>
+                        </label>
                     </div>
 
                     <div class="modal-footer">
                         <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-                        <button type="submit" class="btn-primary">Guardar Tarefa</button>
+                        <button type="submit" class="btn-primary">Adicionar</button>
                     </div>
                 </form>
             </div>
@@ -252,7 +220,7 @@ def gerir_mao_obra():
                 
                 <form action="/maodeobra/valor_hora" method="POST">
                     <div class="form-group">
-                        <label>Valor por Hora (€) *</label>
+                        <label>Valor por Hora (€)</label>
                         <input type="number" step="0.01" name="valor_hora" class="form-control" value="{valor_hora:.2f}" required>
                     </div>
 
@@ -269,7 +237,7 @@ def gerir_mao_obra():
                 document.getElementById('tituloModalTarefa').innerText = 'Adicionar Tarefa';
                 document.getElementById('tarefaId').value = '';
                 document.getElementById('tarefaNome').value = '';
-                document.getElementById('tarefaTempo').value = '';
+                document.getElementById('tarefaTempo').value = '0';
                 document.getElementById('modalTarefa').style.display = 'block';
             }}
 
@@ -294,7 +262,7 @@ def gerir_mao_obra():
 def salvar_tarefa():
     id_tarefa = request.form.get("id")
     tarefa = request.form.get("tarefa")
-    tempo = float(request.form.get("tempo", 10) or 10)
+    tempo = float(request.form.get("tempo", 0) or 0)
     
     df = carregar_dados(EXCEL_MAO_OBRA, ['ID', 'Tarefa', 'TempoMinutos'])
     
