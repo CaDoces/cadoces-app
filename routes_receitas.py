@@ -30,22 +30,6 @@ def obter_valor_hora():
             pass
     return 8.00
 
-def carregar_tarefas_maodeobra(user_email):
-    ficheiro = obter_ficheiro_utilizador(EXCEL_MAO_OBRA)
-    if os.path.exists(ficheiro):
-        try:
-            df = pd.read_excel(ficheiro)
-            tarefas_dict = {}
-            for _, row in df.iterrows():
-                t_nome = str(row.get('Tarefa', ''))
-                t_min = float(row.get('TempoMinutos', 0) or 0)
-                if t_nome:
-                    tarefas_dict[t_nome] = t_min
-            return tarefas_dict
-        except:
-            pass
-    return {}
-
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -64,7 +48,6 @@ def inicializar_tabelas():
             notas TEXT,
             tempo INTEGER,
             ingredientes_usados TEXT,
-            mao_de_obra_usada TEXT,
             custo_total REAL
         )
     ''')
@@ -87,7 +70,7 @@ def carregar_ingredientes_detalhes(user_email):
     ingredientes_dict = {}
     try:
         cursor = conn.execute(
-            'SELECT nome, unidade, quantidade, valor FROM ingredientes_db WHERE user_email = ?', 
+            'SELECT nome, quantidade, valor FROM ingredientes_db WHERE user_email = ?', 
             (user_email,)
         )
         for row in cursor.fetchall():
@@ -95,9 +78,8 @@ def carregar_ingredientes_detalhes(user_email):
             if nome:
                 quantidade = float(row['quantidade'] or 1)
                 valor = float(row['valor'] or 0)
-                unidade = row['unidade'] or ''
                 custo_unitario = (valor / quantidade) if quantidade > 0 else 0.0
-                ingredientes_dict[nome] = {"custo_unitario": custo_unitario, "unidade": unidade}
+                ingredientes_dict[nome] = {"custo_unitario": custo_unitario}
     except Exception as e:
         print("Erro ao carregar ingredientes:", e)
     finally:
@@ -147,7 +129,6 @@ HTML_TEMPLATE = """
     </style>
     <script>
         const dadosIngredientes = {{ custos_js | safe }};
-        const tarefasMaoObra = {{ tarefas_mao_obra_js | safe }};
 
         function abrirModalReceita() {
             document.getElementById('modalReceita').style.display = 'block';
@@ -155,18 +136,6 @@ HTML_TEMPLATE = """
         }
         function fecharModalReceita() {
             document.getElementById('modalReceita').style.display = 'none';
-        }
-
-        function atualizarUnidadeESelector(selectElement) {
-            const nomeIngrediente = selectElement.value;
-            const linha = selectElement.closest('.ingrediente-row');
-            const spanUnidade = linha.querySelector('.unidade-label');
-            if (dadosIngredientes[nomeIngrediente]) {
-                spanUnidade.textContent = dadosIngredientes[nomeIngrediente].unidade;
-            } else {
-                spanUnidade.textContent = '';
-            }
-            recalcularCustoTotal();
         }
 
         function recalcularCustoTotal() {
@@ -189,7 +158,7 @@ HTML_TEMPLATE = """
             }
         }
 
-        function adicionarLinhaIngrediente(containerId = 'ingredientesContainer', ingredienteVal = '', qtdVal = '') {
+        function adicionarLinhaIngrediente(containerId = 'ingredientesContainer', ingredienteVal = '', qtdVal = '', unidadeVal = '') {
             const container = document.getElementById(containerId);
             const row = document.createElement('div');
             row.className = "ingrediente-row";
@@ -201,45 +170,20 @@ HTML_TEMPLATE = """
                 optionsHtml += `<option value="${ing}" ${selected}>${ing}</option>`;
             }
 
-            let unidadeInicial = '';
-            if (ingredienteVal && dadosIngredientes[ingredienteVal]) {
-                unidadeInicial = dadosIngredientes[ingredienteVal].unidade;
-            }
-
             row.innerHTML = `
                 <div style="margin-bottom: 8px;">
-                    <select name="ingrediente[]" class="form-control" onchange="atualizarUnidadeESelector(this)" required>
+                    <select name="ingrediente[]" class="form-control" onchange="recalcularCustoTotal()" required>
                         ${optionsHtml}
                     </select>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" oninput="recalcularCustoTotal()" style="flex: 1;" required>
-                    <span class="unidade-label" style="font-size: 13px; font-weight: 600; color: #734D2E; min-width: 80px;">${unidadeInicial}</span>
+                    <input type="text" name="unidade[]" class="form-control" placeholder="Ex: Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
                     <button type="button" onclick="this.closest('.ingrediente-row').remove(); recalcularCustoTotal();" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
                 </div>
             `;
             container.appendChild(row);
             recalcularCustoTotal();
-        }
-
-        function adicionarLinhaMaoObra(containerId = 'maoObraContainer', tarefaVal = '') {
-            const container = document.getElementById(containerId);
-            const row = document.createElement('div');
-            row.style.cssText = "display: flex; gap: 10px; margin-bottom: 10px; align-items: center;";
-            
-            let optionsHtml = '<option value="" disabled ' + (!tarefaVal ? 'selected' : '') + '>Selecionar tarefa / sub-tarefa...</option>';
-            for (const [tNome, tMin] of Object.entries(tarefasMaoObra)) {
-                let selected = (tNome === tarefaVal) ? 'selected' : '';
-                optionsHtml += `<option value="${tNome}" ${selected}>${tNome} (${tMin} min)</option>`;
-            }
-
-            row.innerHTML = `
-                <select name="tarefa_mao_obra[]" class="form-control" style="flex: 2;" required>
-                    ${optionsHtml}
-                </select>
-                <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
-            `;
-            container.appendChild(row);
         }
     </script>
 </head>
@@ -250,7 +194,7 @@ HTML_TEMPLATE = """
             <a href="/" class="back-btn">&#8592;</a>
             <div>
                 <h1>Receitas e Custos</h1>
-                <p class="sub">Gestão de fichas técnicas com cálculo de ingredientes e mão de obra</p>
+                <p class="sub">Gestão de fichas técnicas com cálculo de ingredientes</p>
             </div>
         </div>
         <div class="top-actions">
@@ -266,7 +210,7 @@ HTML_TEMPLATE = """
                     <th>Nome da Receita</th>
                     <th>Categoria</th>
                     <th>Descrição</th>
-                    <th>Tempo Total</th>
+                    <th>Tempo de Produção</th>
                     <th>Custo Total</th>
                     <th>Ações</th>
                 </tr>
@@ -304,19 +248,16 @@ HTML_TEMPLATE = """
             </div>
             
             <div class="form-group">
+                <label>Tempo de Produção (minutos)</label>
+                <input type="number" name="tempo" class="form-control" placeholder="0" value="0" required>
+            </div>
+
+            <div class="form-group">
                 <label style="display: flex; justify-content: space-between; align-items: center;">
                     <span>Ingredientes</span>
                     <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline" style="padding: 4px 10px; font-size: 12px;">+ Adicionar</button>
                 </label>
                 <div id="ingredientesContainer" style="margin-top: 8px;"></div>
-            </div>
-
-            <div class="form-group">
-                <label style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Etapas de Mão de Obra / Sub-tarefas</span>
-                    <button type="button" onclick="adicionarLinhaMaoObra('maoObraContainer')" class="btn-outline" style="padding: 4px 10px; font-size: 12px;">+ Adicionar Tarefa</button>
-                </label>
-                <div id="maoObraContainer" style="margin-top: 8px;"></div>
             </div>
 
             <div class="form-group">
@@ -344,7 +285,6 @@ HTML_TEMPLATE = """
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         adicionarLinhaIngrediente('ingredientesContainer');
-        adicionarLinhaMaoObra('maoObraContainer');
     });
 </script>
 </body>
@@ -378,20 +318,8 @@ EDITAR_TEMPLATE = """
     </style>
     <script>
         const dadosIngredientes = {{ custos_js | safe }};
-        const tarefasMaoObra = {{ tarefas_mao_obra_js | safe }};
 
-        function atualizarUnidadeESelector(selectElement) {
-            const nomeIngrediente = selectElement.value;
-            const linha = selectElement.closest('.ingrediente-row');
-            const spanUnidade = linha.querySelector('.unidade-label');
-            if (dadosIngredientes[nomeIngrediente]) {
-                spanUnidade.textContent = dadosIngredientes[nomeIngrediente].unidade;
-            } else {
-                spanUnidade.textContent = '';
-            }
-        }
-
-        function adicionarLinhaIngrediente(containerId = 'ingredientesContainer', ingredienteVal = '', qtdVal = '') {
+        function adicionarLinhaIngrediente(containerId = 'ingredientesContainer', ingredienteVal = '', qtdVal = '', unidadeVal = '') {
             const container = document.getElementById(containerId);
             const row = document.createElement('div');
             row.className = "ingrediente-row";
@@ -403,42 +331,17 @@ EDITAR_TEMPLATE = """
                 optionsHtml += `<option value="${ing}" ${selected}>${ing}</option>`;
             }
 
-            let unidadeInicial = '';
-            if (ingredienteVal && dadosIngredientes[ingredienteVal]) {
-                unidadeInicial = dadosIngredientes[ingredienteVal].unidade;
-            }
-
             row.innerHTML = `
                 <div style="margin-bottom: 8px;">
-                    <select name="ingrediente[]" class="form-control" onchange="atualizarUnidadeESelector(this)" required>
+                    <select name="ingrediente[]" class="form-control" required>
                         ${optionsHtml}
                     </select>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" style="flex: 1;" required>
-                    <span class="unidade-label" style="font-size: 13px; font-weight: 600; color: #734D2E; min-width: 80px;">${unidadeInicial}</span>
+                    <input type="text" name="unidade[]" class="form-control" placeholder="Ex: Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
                     <button type="button" onclick="this.closest('.ingrediente-row').remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
                 </div>
-            `;
-            container.appendChild(row);
-        }
-
-        function adicionarLinhaMaoObra(containerId = 'maoObraContainer', tarefaVal = '') {
-            const container = document.getElementById(containerId);
-            const row = document.createElement('div');
-            row.style.cssText = "display: flex; gap: 10px; margin-bottom: 10px; align-items: center;";
-            
-            let optionsHtml = '<option value="" disabled ' + (!tarefaVal ? 'selected' : '') + '>Selecionar tarefa / sub-tarefa...</option>';
-            for (const [tNome, tMin] of Object.entries(tarefasMaoObra)) {
-                let selected = (tNome === tarefaVal) ? 'selected' : '';
-                optionsHtml += `<option value="${tNome}" ${selected}>${tNome} (${tMin} min)</option>`;
-            }
-
-            row.innerHTML = `
-                <select name="tarefa_mao_obra[]" class="form-control" style="flex: 2;" required>
-                    ${optionsHtml}
-                </select>
-                <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
             `;
             container.appendChild(row);
         }
@@ -474,19 +377,16 @@ EDITAR_TEMPLATE = """
             </div>
             
             <div class="form-group">
+                <label>Tempo de Produção (minutos)</label>
+                <input type="number" name="tempo" class="form-control" value="{{ receita.tempo or 0 }}" required>
+            </div>
+
+            <div class="form-group">
                 <label style="display: flex; justify-content: space-between; align-items: center;">
                     <span>Ingredientes</span>
                     <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline">+ Adicionar</button>
                 </label>
                 <div id="ingredientesContainer" style="margin-top: 8px;"></div>
-            </div>
-
-            <div class="form-group">
-                <label style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Etapas de Mão de Obra / Sub-tarefas</span>
-                    <button type="button" onclick="adicionarLinhaMaoObra('maoObraContainer')" class="btn-outline">+ Adicionar Tarefa</button>
-                </label>
-                <div id="maoObraContainer" style="margin-top: 8px;"></div>
             </div>
 
             <div class="form-group">
@@ -511,19 +411,10 @@ EDITAR_TEMPLATE = """
         const ingredientesAnteriores = {{ ingredientes_atuais_json | safe }};
         if (ingredientesAnteriores && ingredientesAnteriores.length > 0) {
             ingredientesAnteriores.forEach(item => {
-                adicionarLinhaIngrediente('ingredientesContainer', item.nome, item.quantidade);
+                adicionarLinhaIngrediente('ingredientesContainer', item.nome, item.quantidade, item.unidade);
             });
         } else {
             adicionarLinhaIngrediente('ingredientesContainer');
-        }
-
-        const tarefasAnteriores = {{ tarefas_atuais_json | safe }};
-        if (tarefasAnteriores && tarefasAnteriores.length > 0) {
-            tarefasAnteriores.forEach(tNome => {
-                adicionarLinhaMaoObra('maoObraContainer', tNome);
-            });
-        } else {
-            adicionarLinhaMaoObra('maoObraContainer');
         }
     });
 </script>
@@ -539,35 +430,27 @@ def listar_receitas():
 
     lista_receitas = carregar_receitas(user_email)
     ingredientes_dict = carregar_ingredientes_detalhes(user_email)
-    tarefas_mao_obra = carregar_tarefas_maodeobra(user_email)
     
     linhas_tabela = ""
     if lista_receitas:
         for row in lista_receitas:
             categoria_txt = row['categoria'] if 'categoria' in row.keys() and row['categoria'] else 'Geral'
             custo_total = float(row['custo_total'] or 0)
+            minutos = int(row['tempo'] or 0)
             
-            mao_de_obra_str = row.get('mao_de_obra_usada', '') or ''
-            minutos_totais = 0
-            if mao_de_obra_str:
-                for t in mao_de_obra_str.split(" | "):
-                    t = t.strip()
-                    if t in tarefas_mao_obra:
-                        minutos_totais += tarefas_mao_obra[t]
-            
-            if minutos_totais >= 60:
-                h = int(minutos_totais // 60)
-                m = int(minutos_totais % 60)
+            if minutos >= 60:
+                h = int(minutos // 60)
+                m = int(minutos % 60)
                 tempo_str = f"{h}h {m}min" if m > 0 else f"{h}h"
             else:
-                tempo_str = f"{int(minutos_totais)}min"
+                tempo_str = f"{minutos}min"
 
             linhas_tabela += f"""
             <tr>
                 <td data-label="Nome da Receita"><strong>{row['nome'] or 'Sem Nome'}</strong></td>
                 <td data-label="Categoria"><span style="background: #F5EBE0; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #734D2E;">{categoria_txt}</span></td>
                 <td data-label="Descrição">{row['descricao'] or '-'}</td>
-                <td data-label="Tempo Total">{tempo_str}</td>
+                <td data-label="Tempo de Produção">{tempo_str}</td>
                 <td data-label="Custo Total" class="cost-val">€{custo_total:.2f}</td>
                 <td data-label="Ações">
                     <div class="action-icons">
@@ -583,13 +466,11 @@ def listar_receitas():
         linhas_tabela = '<tr><td colspan="6" style="text-align:center; color:#8C7A6B; padding: 30px;">Nenhuma receita registada.</td></tr>'
 
     custos_js = json.dumps(ingredientes_dict)
-    tarefas_mao_obra_js = json.dumps(tarefas_mao_obra)
 
     return render_template_string(
         HTML_TEMPLATE,
         linhas_tabela=linhas_tabela,
-        custos_js=custos_js,
-        tarefas_mao_obra_js=tarefas_mao_obra_js
+        custos_js=custos_js
     )
 
 @receitas_bp.route("/receitas/adicionar", methods=["POST"])
@@ -601,47 +482,35 @@ def adicionar_receita():
     nome = request.form.get("nome")
     categoria = request.form.get("categoria")
     descricao = request.form.get("descricao")
+    tempo = int(request.form.get("tempo", 0) or 0)
     preparacao = request.form.get("preparacao")
     notas = request.form.get("notas")
     
     ingredientes_selecionados = request.form.getlist("ingrediente[]")
     quantidades_inseridas = request.form.getlist("quantidade[]")
-    tarefas_selecionadas = request.form.getlist("tarefa_mao_obra[]")
+    unidades_inseridas = request.form.getlist("unidade[]")
     
     ingredientes_info = carregar_ingredientes_detalhes(user_email)
-    tarefas_mao_obra = carregar_tarefas_maodeobra(user_email)
-    valor_hora = obter_valor_hora()
     
     custo_total_calculado = 0.0
-    
     lista_ing_final = []
-    for ing, qtd in zip(ingredientes_selecionados, quantidades_inseridas):
+    
+    for ing, qtd, und in zip(ingredientes_selecionados, quantidades_inseridas, unidades_inseridas):
         if ing:
             qtd_num = float(qtd) if qtd else 0.0
-            unidade_ing = ingredientes_info[ing]["unidade"] if ing in ingredientes_info else ""
-            lista_ing_final.append(f"{qtd_num}{unidade_ing} {ing}")
+            und_txt = und.strip() if und else ""
+            lista_ing_final.append(f"{qtd_num} {und_txt} {ing}".strip())
             
             if ing in ingredientes_info:
                 custo_total_calculado += ingredientes_info[ing]["custo_unitario"] * qtd_num
             
     ingredientes_str = " | ".join(lista_ing_final)
-
-    lista_tarefas_final = []
-    minutos_totais = 0
-    for tarefa in tarefas_selecionadas:
-        if tarefa and tarefa in tarefas_mao_obra:
-            minutos_tarefa = tarefas_mao_obra[tarefa]
-            minutos_totais += minutos_tarefa
-            lista_tarefas_final.append(tarefa)
-            custo_total_calculado += (minutos_tarefa / 60) * valor_hora
-
-    mao_de_obra_str = " | ".join(lista_tarefas_final)
     
     conn = get_db_connection()
     conn.execute('''
-        INSERT INTO receitas (user_email, nome, categoria, descricao, preparacao, notas, tempo, ingredientes_usados, mao_de_obra_usada, custo_total)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (user_email, nome, categoria, descricao, preparacao, notas, int(minutos_totais), ingredientes_str, mao_de_obra_str, custo_total_calculado))
+        INSERT INTO receitas (user_email, nome, categoria, descricao, preparacao, notas, tempo, ingredientes_usados, custo_total)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (user_email, nome, categoria, descricao, preparacao, notas, tempo, ingredientes_str, custo_total_calculado))
     conn.commit()
     conn.close()
     
@@ -661,10 +530,7 @@ def editar_receita(id):
         return redirect(url_for('receitas_bp.listar_receitas'))
 
     ingredientes_info = carregar_ingredientes_detalhes(user_email)
-    tarefas_mao_obra = carregar_tarefas_maodeobra(user_email)
-    
     custos_js = json.dumps(ingredientes_info)
-    tarefas_mao_obra_js = json.dumps(tarefas_mao_obra)
 
     ingredientes_atuais = []
     ingredientes_str = receita['ingredientes_usados'] or ""
@@ -674,29 +540,22 @@ def editar_receita(id):
             p = p.strip()
             for ing_nome in ingredientes_info.keys():
                 if p.endswith(ing_nome):
-                    qtd_str = p[:-len(ing_nome)].strip()
-                    unidade = ingredientes_info[ing_nome]["unidade"]
-                    if unidade and qtd_str.endswith(unidade):
-                        qtd_str = qtd_str[:-len(unidade)].strip()
+                    resto = p[:-len(ing_nome)].strip()
+                    partes_resto = resto.split(" ", 1)
+                    qtd_str = partes_resto[0] if len(partes_resto) > 0 else "0"
+                    und_str = partes_resto[1] if len(partes_resto) > 1 else ""
                     try:
                         qtd_num = float(qtd_str)
                     except:
-                        qtd_num = 1.0
-                    ingredientes_atuais.append({"nome": ing_nome, "quantidade": qtd_num})
+                        qtd_num = 0.0
+                    ingredientes_atuais.append({"nome": ing_nome, "quantidade": qtd_num, "unidade": und_str})
                     break
-
-    tarefas_atuais = []
-    mao_de_obra_str = receita.get('mao_de_obra_usada', '') or ""
-    if mao_de_obra_str:
-        tarefas_atuais = [t.strip() for t in mao_de_obra_str.split(" | ") if t.strip()]
 
     return render_template_string(
         EDITAR_TEMPLATE,
         receita=receita,
         custos_js=custos_js,
-        tarefas_mao_obra_js=tarefas_mao_obra_js,
-        ingredientes_atuais_json=json.dumps(ingredientes_atuais),
-        tarefas_atuais_json=json.dumps(tarefas_atuais)
+        ingredientes_atuais_json=json.dumps(ingredientes_atuais)
     )
 
 @receitas_bp.route("/receitas/atualizar/<int:id>", methods=["POST"])
@@ -708,48 +567,36 @@ def atualizar_receita(id):
     nome = request.form.get("nome")
     categoria = request.form.get("categoria")
     descricao = request.form.get("descricao")
+    tempo = int(request.form.get("tempo", 0) or 0)
     preparacao = request.form.get("preparacao")
     notas = request.form.get("notas")
     
     ingredientes_selecionados = request.form.getlist("ingrediente[]")
     quantidades_inseridas = request.form.getlist("quantidade[]")
-    tarefas_selecionadas = request.form.getlist("tarefa_mao_obra[]")
+    unidades_inseridas = request.form.getlist("unidade[]")
     
     ingredientes_info = carregar_ingredientes_detalhes(user_email)
-    tarefas_mao_obra = carregar_tarefas_maodeobra(user_email)
-    valor_hora = obter_valor_hora()
     
     custo_total_calculado = 0.0
-    
     lista_ing_final = []
-    for ing, qtd in zip(ingredientes_selecionados, quantidades_inseridas):
+    
+    for ing, qtd, und in zip(ingredientes_selecionados, quantidades_inseridas, unidades_inseridas):
         if ing:
             qtd_num = float(qtd) if qtd else 0.0
-            unidade_ing = ingredientes_info[ing]["unidade"] if ing in ingredientes_info else ""
-            lista_ing_final.append(f"{qtd_num}{unidade_ing} {ing}")
+            und_txt = und.strip() if und else ""
+            lista_ing_final.append(f"{qtd_num} {und_txt} {ing}".strip())
             
             if ing in ingredientes_info:
                 custo_total_calculado += ingredientes_info[ing]["custo_unitario"] * qtd_num
             
     ingredientes_str = " | ".join(lista_ing_final)
 
-    lista_tarefas_final = []
-    minutos_totais = 0
-    for tarefa in tarefas_selecionadas:
-        if tarefa and tarefa in tarefas_mao_obra:
-            minutos_tarefa = tarefas_mao_obra[tarefa]
-            minutos_totais += minutos_tarefa
-            lista_tarefas_final.append(tarefa)
-            custo_total_calculado += (minutos_tarefa / 60) * valor_hora
-
-    mao_de_obra_str = " | ".join(lista_tarefas_final)
-
     conn = get_db_connection()
     conn.execute('''
         UPDATE receitas
-        SET nome = ?, categoria = ?, descricao = ?, preparacao = ?, notas = ?, tempo = ?, ingredientes_usados = ?, mao_de_obra_usada = ?, custo_total = ?
+        SET nome = ?, categoria = ?, descricao = ?, preparacao = ?, notas = ?, tempo = ?, ingredientes_usados = ?, custo_total = ?
         WHERE id = ? AND user_email = ?
-    ''', (nome, categoria, descricao, preparacao, notas, int(minutos_totais), ingredientes_str, mao_de_obra_str, custo_total_calculado, id, user_email))
+    ''', (nome, categoria, descricao, preparacao, notas, tempo, ingredientes_str, custo_total_calculado, id, user_email))
     conn.commit()
     conn.close()
 
