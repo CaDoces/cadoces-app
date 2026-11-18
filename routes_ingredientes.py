@@ -86,6 +86,8 @@ HTML_TEMPLATE = """
         .top-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; position: relative; }
         .btn-outline { background: #F5EBE0; border: 1px solid #EEDCCE; color: #4A3B32; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s; }
         .btn-outline:hover { background: #EEDCCE; }
+        .btn-danger { background: #FDEDEC; border: 1px solid #F5B7B1; color: #C0392B; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 14px; transition: all 0.2s; }
+        .btn-danger:hover { background: #FADBD8; }
         .btn-primary { background: #D99B6A; color: #FFFFFF; border: none; padding: 11px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; transition: background 0.2s; box-shadow: 0 2px 4px rgba(217,155,106,0.2); }
         .btn-primary:hover { background: #C48757; }
         .dropdown { position: relative; display: inline-block; }
@@ -103,6 +105,10 @@ HTML_TEMPLATE = """
         .cost-val { color: #D99B6A; font-weight: 600; }
         .stock-verde { color: #27AE60; font-weight: bold; }
         .stock-vermelho { color: #C0392B; font-weight: bold; }
+        .badge-alerta { display: inline-block; background: #FDEDEC; color: #C0392B; border: 1px solid #F5B7B1; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 6px; }
+        .alert-banner { padding: 14px 20px; border-radius: 10px; margin-top: 20px; font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .alert-erro { background: #FDEDEC; border: 1px solid #F5B7B1; color: #C0392B; }
+        .alert-sucesso { background: #EAFAF1; border: 1px solid #A9DFBF; color: #1E8449; }
         .action-icons { display: flex; gap: 12px; align-items: center; }
         .action-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #8C7A6B; padding: 0; text-decoration: none; transition: color 0.2s; }
         .action-btn:hover { color: #4A3B32; }
@@ -205,7 +211,12 @@ HTML_TEMPLATE = """
             </div>
         </div>
         <div class="top-actions">
-            <a href="{{ url_for('ingredientes_bp.lista_compras') }}" class="btn-outline" style="background: #FDF3E3; border-color: #F3E5D0; color: #B85D19;">🛒 Lista de Compras</a>
+            <a href="{{ url_for('ingredientes_bp.lista_compras') }}" class="btn-outline" style="background: #FDF3E3; border-color: #F3E5D0; color: #B85D19;">
+                🛒 Lista de Compras
+                {% if qtd_stock_baixo and qtd_stock_baixo > 0 %}
+                <span style="background: #C0392B; color: #FFF; border-radius: 50%; padding: 2px 7px; font-size: 11px;">{{ qtd_stock_baixo }}</span>
+                {% endif %}
+            </a>
             <button id="btn-selecionar" onclick="toggleSelectionMode()" class="btn-outline">🗂 Selecionar</button>
             <div class="dropdown" id="dropdownOrdenar">
                 <button onclick="toggleDropdown('dropdownOrdenar')" class="btn-outline">↕ Ordenar</button>
@@ -217,18 +228,35 @@ HTML_TEMPLATE = """
                 </div>
             </div>
             <a href="#" onclick="let box=document.getElementById('import-box'); box.style.display = box.style.display === 'flex' ? 'none' : 'flex'; return false;" class="btn-outline">📤 Importar/Exportar</a>
+            <form action="{{ url_for('ingredientes_bp.apagar_todos') }}" method="POST" style="margin: 0;" onsubmit="return confirm('⚠️ ATENÇÃO: Tem a certeza que deseja apagar TODA a lista de ingredientes? Esta ação não pode ser desfeita!');">
+                <button type="submit" class="btn-danger">🗑️ Apagar Tudo</button>
+            </form>
             <a href="#" onclick="window.print(); return false;" class="btn-outline">🖨 Imprimir</a>
             <a href="/" class="btn-outline">🏠 Menu</a>
             <a href="#form-adicionar" onclick="document.getElementById('form-adicionar').style.display='grid';" class="btn-primary">+ Adicionar</a>
         </div>
     </div>
 
+    {% if erro %}
+    <div class="alert-banner alert-erro">
+        <span>⚠️ {{ erro }}</span>
+        <span style="cursor:pointer;" onclick="this.parentElement.style.display='none';">✖</span>
+    </div>
+    {% endif %}
+
+    {% if sucesso %}
+    <div class="alert-banner alert-sucesso">
+        <span>✅ {{ sucesso }}</span>
+        <span style="cursor:pointer;" onclick="this.parentElement.style.display='none';">✖</span>
+    </div>
+    {% endif %}
+
     {% if pagina == 'lista_compras' %}
         <div class="content-box">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
                 <div>
                     <h2 style="margin: 0; color: #2C1E1A; font-size: 20px;">Lista de Compras Recomendada</h2>
-                    <p class="sub">Ingredientes com stock esgotado ou inferior a 1 unidade</p>
+                    <p class="sub">Ingredientes esgotados (0) ou com stock baixo (1 unidade)</p>
                 </div>
                 <a href="{{ url_for('ingredientes_bp.ingredientes') }}" class="btn-outline">← Voltar ao Stock</a>
             </div>
@@ -245,13 +273,19 @@ HTML_TEMPLATE = """
                     {% for item in lista_compras %}
                     <tr>
                         <td data-label="Ingrediente"><strong>{{ item.nome }}</strong></td>
-                        <td data-label="Stock Atual">{{ item.stock_unidades|int if item.stock_unidades == item.stock_unidades|int else item.stock_unidades }} {{ item.unidade }} ({{ item.stock|int if item.stock == item.stock|int else item.stock }}{{ item.unidade }})</td>
-                        <td data-label="Estado"><span style="background: #FDEDEC; color: #C0392B; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px;">Esgotado / Baixo</span></td>
+                        <td data-label="Stock Atual">{{ item.stock_unidades|int if item.stock_unidades == item.stock_unidades|int else item.stock_unidades }} unid. ({{ item.stock|int if item.stock == item.stock|int else item.stock }}{{ item.unidade }})</td>
+                        <td data-label="Estado">
+                            {% if item.stock_unidades <= 0 %}
+                            <span style="background: #FDEDEC; color: #C0392B; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px;">🚨 Esgotado (0)</span>
+                            {% else %}
+                            <span style="background: #FEF9E7; color: #B7950B; border: 1px solid #F9E79F; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px;">⚠️ Stock Baixo (1 unid.)</span>
+                            {% endif %}
+                        </td>
                         <td data-label="Preço Estimado" class="cost-val">€{{ "%.2f"|format(item.valor) }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" style="text-align: center; color: #27AE60; padding: 30px; font-weight: bold;">🎉 Está tudo em ordem! Nenhum ingrediente em falta no stock.</td>
+                        <td colspan="4" style="text-align: center; color: #27AE60; padding: 30px; font-weight: bold;">🎉 Está tudo em ordem! Nenhum ingrediente com stock baixo ou em falta.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -292,6 +326,13 @@ HTML_TEMPLATE = """
             </form>
         </div>
     {% elif pagina == 'ingredientes' %}
+        {% if qtd_stock_baixo and qtd_stock_baixo > 0 %}
+        <div class="alert-banner alert-erro">
+            <span>⚠️ Atenção: Tens <strong>{{ qtd_stock_baixo }}</strong> ingrediente(s) esgotado(s) ou com apenas 1 unidade em stock!</span>
+            <a href="{{ url_for('ingredientes_bp.lista_compras') }}" style="color: #C0392B; text-decoration: underline;">Ver Lista de Compras →</a>
+        </div>
+        {% endif %}
+
         <input type="text" id="searchInput" onkeyup="filtrarTabela()" placeholder="🔍 Pesquisar ingrediente ou material..." class="search-bar">
 
         <div id="import-box" class="import-box">
@@ -354,18 +395,25 @@ HTML_TEMPLATE = """
                 </thead>
                 <tbody>
                     {% for item in lista %}
-                    <tr id="item-{{ item.original_index }}">
+                    <tr id="item-{{ item.original_index }}" style="{% if item.stock_unidades <= 1 %}background-color: #FFF9F9;{% endif %}">
                         <td class="select-col"><input type="checkbox" name="selecionado" value="{{ item.original_index }}"></td>
                         <td data-label="Unidade">{{ item.unidade }}</td>
-                        <td data-label="Nome"><strong>{{ item.nome }}</strong></td>
+                        <td data-label="Nome">
+                            <strong>{{ item.nome }}</strong>
+                            {% if item.stock_unidades <= 0 %}
+                                <span class="badge-alerta">🚨 Esgotado</span>
+                            {% elif item.stock_unidades <= 1 %}
+                                <span class="badge-alerta" style="background: #FEF9E7; color: #B7950B; border-color: #F9E79F;">⚠️ Stock Baixo</span>
+                            {% endif %}
+                        </td>
                         <td data-label="Compra">€{{ "%.2f"|format(item.valor) }} / {{ item.quantidade|int if item.quantidade == item.quantidade|int else item.quantidade }}{{ item.unidade }}</td>
                         <td data-label="Stock Qtd. (Total)">
-                            <strong class="{% if item.stock >= (3 * item.quantidade) %}stock-verde{% elif item.stock <= item.quantidade %}stock-vermelho{% endif %}">
+                            <strong class="{% if item.stock_unidades <= 1 %}stock-vermelho{% elif item.stock_unidades >= 3 %}stock-verde{% endif %}">
                                 {{ item.stock|int if item.stock == item.stock|int else item.stock }}{{ item.unidade }}
                             </strong>
                         </td>
                         <td data-label="Stock Unidades">
-                            <div class="unit-stock-control">
+                            <div class="unit-stock-control" style="{% if item.stock_unidades <= 1 %}border-color: #F5B7B1; background: #FDEDEC;{% endif %}">
                                 <form action="{{ url_for('ingredientes_bp.decrementar_stock', index=item.original_index) }}" method="POST" style="display:inline;">
                                     <button type="submit" class="unit-btn" title="Menos uma unidade">-</button>
                                 </form>
@@ -408,8 +456,13 @@ def ingredientes():
     if not user_email:
         return redirect('/')
 
+    erro = request.args.get('erro')
+    sucesso = request.args.get('sucesso')
+
     dados_brutos = carregar_dados_db(user_email)
     lista = []
+    qtd_stock_baixo = 0
+
     for row in dados_brutos:
         nome = str(row.get('nome', ''))
         unidade = str(row.get('unidade', ''))
@@ -418,6 +471,9 @@ def ingredientes():
         stock_unidades = parse_val(row.get('stock_unidades', 0))
         alergenios = str(row.get('alergenios', ''))
         
+        if stock_unidades <= 1:
+            qtd_stock_baixo += 1
+
         stock = stock_unidades * quantidade
         custo_unitario = (valor / quantidade) if quantidade > 0 else 0
         lista.append({
@@ -442,7 +498,14 @@ def ingredientes():
     elif ordenar == 'qtd_desc':
         lista = sorted(lista, key=lambda x: x['quantidade'], reverse=True)
 
-    return render_template_string(HTML_TEMPLATE, pagina="ingredientes", lista=lista)
+    return render_template_string(
+        HTML_TEMPLATE,
+        pagina="ingredientes",
+        lista=lista,
+        qtd_stock_baixo=qtd_stock_baixo,
+        erro=erro,
+        sucesso=sucesso
+    )
 
 @ingredientes_bp.route("/ingredientes/lista_compras")
 def lista_compras():
@@ -458,7 +521,7 @@ def lista_compras():
         valor = parse_val(row.get('valor', 0))
         stock = stock_unidades * quantidade
         
-        if stock_unidades <= 0:
+        if stock_unidades <= 1:
             lista_compras.append({
                 "nome": str(row.get('nome', '')),
                 "unidade": str(row.get('unidade', '')),
@@ -467,7 +530,12 @@ def lista_compras():
                 "valor": valor
             })
 
-    return render_template_string(HTML_TEMPLATE, pagina="lista_compras", lista_compras=lista_compras)
+    return render_template_string(
+        HTML_TEMPLATE,
+        pagina="lista_compras",
+        lista_compras=lista_compras,
+        qtd_stock_baixo=len(lista_compras)
+    )
 
 @ingredientes_bp.route("/adicionar", methods=["POST"])
 def adicionar():
@@ -475,16 +543,23 @@ def adicionar():
     if not user_email:
         return redirect('/')
 
-    nome = request.form.get("nome")
-    unidade = request.form.get("unidade")
+    nome = request.form.get("nome", "").strip()
+    unidade = request.form.get("unidade", "").strip()
     quantidade = parse_val(request.form.get("quantidade", 1))
     valor = parse_val(request.form.get("valor", 0))
     stock_unidades = parse_val(request.form.get("stock_unidades", 0))
-    alergenios = request.form.get("alergenios", "")
+    alergenios = request.form.get("alergenios", "").strip()
     stock = stock_unidades * quantidade
 
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Verificar se já existe um ingrediente com o mesmo nome (ignorando maiúsculas/minúsculas)
+    cursor.execute("SELECT id FROM ingredientes_db WHERE user_email = ? AND LOWER(TRIM(nome)) = LOWER(?)", (user_email, nome))
+    if cursor.fetchone():
+        conn.close()
+        return redirect(url_for("ingredientes_bp.ingredientes", erro=f"O ingrediente '{nome}' já existe na lista! Não é possível repetir."))
+
     cursor.execute('''
         INSERT INTO ingredientes_db (user_email, nome, unidade, quantidade, valor, stock, stock_unidades, alergenios)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -492,7 +567,7 @@ def adicionar():
     conn.commit()
     conn.close()
 
-    return redirect(url_for("ingredientes_bp.ingredientes"))
+    return redirect(url_for("ingredientes_bp.ingredientes", sucesso=f"Ingrediente '{nome}' adicionado com sucesso!"))
 
 @ingredientes_bp.route("/editar/<int:index>")
 def editar(index):
@@ -516,16 +591,23 @@ def atualizar(index):
     if not user_email:
         return redirect('/')
 
-    nome = request.form.get("nome")
-    unidade = request.form.get("unidade")
+    nome = request.form.get("nome", "").strip()
+    unidade = request.form.get("unidade", "").strip()
     quantidade = parse_val(request.form.get("quantidade", 1))
     valor = parse_val(request.form.get("valor", 0))
     stock_unidades = parse_val(request.form.get("stock_unidades", 0))
-    alergenios = request.form.get("alergenios", "")
+    alergenios = request.form.get("alergenios", "").strip()
     stock = stock_unidades * quantidade
 
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Verificar se outro ingrediente já usa este nome
+    cursor.execute("SELECT id FROM ingredientes_db WHERE user_email = ? AND LOWER(TRIM(nome)) = LOWER(?) AND id != ?", (user_email, nome, index))
+    if cursor.fetchone():
+        conn.close()
+        return redirect(url_for("ingredientes_bp.ingredientes", erro=f"Já existe outro ingrediente com o nome '{nome}'."))
+
     cursor.execute('''
         UPDATE ingredientes_db
         SET nome = ?, unidade = ?, quantidade = ?, valor = ?, stock = ?, stock_unidades = ?, alergenios = ?
@@ -534,7 +616,7 @@ def atualizar(index):
     conn.commit()
     conn.close()
 
-    return redirect(url_for("ingredientes_bp.ingredientes"))
+    return redirect(url_for("ingredientes_bp.ingredientes", sucesso=f"Ingrediente '{nome}' atualizado!"))
 
 @ingredientes_bp.route("/incrementar_stock/<int:index>", methods=["POST"])
 def incrementar_stock(index):
@@ -627,6 +709,20 @@ def apagar(index):
 
     return redirect(url_for("ingredientes_bp.ingredientes"))
 
+@ingredientes_bp.route("/apagar_todos", methods=["POST"])
+def apagar_todos():
+    user_email = session.get('user_email')
+    if not user_email:
+        return redirect('/')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ingredientes_db WHERE user_email = ?", (user_email,))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("ingredientes_bp.ingredientes", sucesso="Toda a lista de ingredientes foi apagada com sucesso."))
+
 @ingredientes_bp.route("/exportar")
 def exportar_excel():
     user_email = session.get('user_email')
@@ -652,6 +748,9 @@ def importar_excel():
         return redirect('/')
 
     ficheiro = request.files.get("ficheiro")
+    adicionados = 0
+    ignorados = 0
+
     if ficheiro and ficheiro.filename:
         ext = ficheiro.filename.split(".")[-1].lower()
         try:
@@ -665,24 +764,39 @@ def importar_excel():
             conn = get_db_connection()
             cursor = conn.cursor()
 
+            # Obter nomes existentes para evitar duplicados na importação
+            cursor.execute("SELECT LOWER(TRIM(nome)) FROM ingredientes_db WHERE user_email = ?", (user_email,))
+            existentes = {row[0] for row in cursor.fetchall() if row[0]}
+
             for _, row in df.iterrows():
                 row_dict = {str(c).strip().lower(): v for c, v in row.items()}
-                nome = str(row_dict.get("nome", row_dict.get("ingrediente", "Sem Nome")))
-                unidade = str(row_dict.get("unidade", "g"))
+                nome = str(row_dict.get("nome", row_dict.get("ingrediente", "Sem Nome"))).strip()
+                
+                if nome.lower() in existentes:
+                    ignorados += 1
+                    continue
+
+                existentes.add(nome.lower())
+                unidade = str(row_dict.get("unidade", "g")).strip()
                 quantidade = parse_val(row_dict.get("quantidade", row_dict.get("qtd", 1)))
                 valor = parse_val(row_dict.get("valor", row_dict.get("preço", row_dict.get("preco", 0))))
                 stock_unidades = parse_val(row_dict.get("stock_unidades", row_dict.get("stock unidades", 0)))
-                alergenios = str(row_dict.get("alergenios", row_dict.get("alergénios", "")))
+                alergenios = str(row_dict.get("alergenios", row_dict.get("alergénios", ""))).strip()
                 stock = stock_unidades * quantidade
 
                 cursor.execute('''
                     INSERT INTO ingredientes_db (user_email, nome, unidade, quantidade, valor, stock, stock_unidades, alergenios)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (user_email, nome, unidade, quantidade, valor, stock, stock_unidades, alergenios))
+                adicionados += 1
 
             conn.commit()
             conn.close()
         except Exception as e:
             print("Erro ao importar:", e)
+            return redirect(url_for("ingredientes_bp.ingredientes", erro="Erro ao ler o ficheiro importado."))
 
-    return redirect(url_for("ingredientes_bp.ingredientes"))
+    msg = f"Importação concluída: {adicionados} adicionado(s)."
+    if ignorados > 0:
+        msg += f" {ignorados} repetido(s) ignorado(s)."
+    return redirect(url_for("ingredientes_bp.ingredientes", sucesso=msg))

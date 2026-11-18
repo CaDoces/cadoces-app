@@ -30,9 +30,12 @@ def guardar_dados(ficheiro_base, df):
 def obter_valor_hora():
     ficheiro = obter_ficheiro_utilizador(EXCEL_CONFIG)
     if os.path.exists(ficheiro):
-        df = pd.read_excel(ficheiro)
-        if not df.empty and 'ValorHora' in df.columns:
-            return float(df.iloc[0]['ValorHora'] or 8.00)
+        try:
+            df = pd.read_excel(ficheiro)
+            if not df.empty and 'ValorHora' in df.columns:
+                return float(df.iloc[0]['ValorHora'] or 8.00)
+        except:
+            pass
     return 8.00
 
 @maodeobra_bp.route("/maodeobra")
@@ -63,9 +66,9 @@ def gerir_mao_obra():
                 
             linhas_tabela += f"""
             <tr>
-                <td data-label="Tarefa" style="font-weight: 600; color: #111;">{tarefa}</td>
-                <td data-label="Tempo" style="color: #666;">{tempo_str}</td>
-                <td data-label="Custo" style="font-weight: bold; color: #b85d19;">€{custo:.2f}</td>
+                <td data-label="Tarefa" style="font-weight: 600; color: #4A3B32;">{tarefa}</td>
+                <td data-label="Tempo" style="color: #8C7A6B;">{tempo_str}</td>
+                <td data-label="Custo" style="font-weight: bold; color: #D99B6A;">€{custo:.2f}</td>
                 <td data-label="Ações" style="text-align: right;">
                     <button onclick="abrirModalEditar('{id_tarefa}', '{tarefa}', '{minutos}')" style="background:none; border:none; cursor:pointer; font-size: 16px; margin-right: 8px;" title="Editar">✏️</button>
                     <a href="/maodeobra/apagar/{id_tarefa}" onclick="return confirm('Tens a certeza que queres apagar esta tarefa?')" style="text-decoration: none; font-size: 16px;" title="Apagar">🗑️</a>
@@ -74,7 +77,7 @@ def gerir_mao_obra():
             """
             
     if not linhas_tabela:
-        linhas_tabela = '<tr><td colspan="4" style="text-align:center; color:#888; padding: 30px;">Nenhuma tarefa registada.</td></tr>'
+        linhas_tabela = '<tr><td colspan="4" style="text-align:center; color:#8C7A6B; padding: 30px;">Nenhuma tarefa registada.</td></tr>'
 
     total_h = int(total_minutos // 60)
     total_m = int(total_minutos % 60)
@@ -88,46 +91,46 @@ def gerir_mao_obra():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>CáDoces - Mão de Obra</title>
         <style>
-            body {{ font-family: Arial, sans-serif; background-color: #fdfbf7; margin: 0; padding: 30px; }}
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #FAF8F5; color: #4A3B32; margin: 0; padding: 30px; }}
             .container {{ max-width: 1200px; margin: auto; }}
             
-            .header-bar {{ display: flex; justify-content: space-between; align-items: center; background: #fffdf9; padding: 20px 30px; border: 2px solid #f3e5d0; border-radius: 12px; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }}
-            .header-left h1 {{ margin: 0; color: #111; font-size: 24px; }}
-            .header-left p {{ margin: 5px 0 0 0; color: #666; font-size: 14px; }}
+            .header-bar {{ display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; padding: 20px 25px; border: 1px solid #EEDCCE; border-radius: 14px; box-shadow: 0 2px 6px rgba(74,59,50,0.02); margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }}
+            .header-left h1 {{ margin: 0; color: #2C1E1A; font-size: 24px; font-weight: 700; }}
+            .header-left p {{ margin: 4px 0 0 0; color: #8C7A6B; font-size: 14px; }}
             
             .header-actions {{ display: flex; gap: 12px; flex-wrap: wrap; }}
-            .btn-secondary-top {{ background: #fff; border: 2px solid #f3e5d0; color: #333; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 6px; font-size: 14px; }}
-            .btn-secondary-top:hover {{ background: #f9f0e6; }}
+            .btn-secondary-top {{ background: #F5EBE0; border: 1px solid #EEDCCE; color: #4A3B32; padding: 10px 18px; border-radius: 10px; cursor: pointer; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; font-size: 14px; transition: all 0.2s; }}
+            .btn-secondary-top:hover {{ background: #EEDCCE; }}
             
-            .btn-primary {{ background: #dfa673; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 6px; font-size: 14px; }}
-            .btn-primary:hover {{ background: #c8915f; }}
+            .btn-primary {{ background: #D99B6A; color: #FFFFFF; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; font-size: 14px; box-shadow: 0 2px 4px rgba(217,155,106,0.2); transition: background 0.2s; }}
+            .btn-primary:hover {{ background: #C48757; }}
             
             .cards-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 35px; }}
-            .card-metric {{ background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 20px 25px; position: relative; }}
-            .card-metric.highlight {{ background: #fef4e4; border-color: #f3e5d0; }}
-            .card-header {{ display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: bold; color: #444; margin-bottom: 12px; }}
-            .card-value {{ font-size: 32px; font-weight: bold; color: #111; }}
-            .icon-badge {{ background: #f3e5d0; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 16px; }}
+            .card-metric {{ background: #FFFFFF; border: 1px solid #EEDCCE; border-radius: 14px; padding: 20px 25px; position: relative; box-shadow: 0 2px 6px rgba(74,59,50,0.02); }}
+            .card-metric.highlight {{ background: #FEF9E7; border-color: #F9E79F; }}
+            .card-header {{ display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; color: #734D2E; margin-bottom: 12px; }}
+            .card-value {{ font-size: 32px; font-weight: bold; color: #2C1E1A; }}
+            .icon-badge {{ background: #F5EBE0; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 16px; border: 1px solid #EEDCCE; }}
             
-            .section-title {{ font-size: 20px; font-weight: bold; color: #111; margin-bottom: 15px; }}
-            .content-box {{ background: #fffdf9; border: 2px solid #f3e5d0; border-radius: 12px; padding: 10px 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
+            .section-title {{ font-size: 20px; font-weight: 700; color: #2C1E1A; margin-bottom: 15px; }}
+            .content-box {{ background: #FFFFFF; border: 1px solid #EEDCCE; border-radius: 14px; padding: 10px 25px; box-shadow: 0 2px 6px rgba(74,59,50,0.02); }}
             table.table-custom {{ width: 100%; border-collapse: collapse; }}
-            table.table-custom th {{ background-color: transparent; color: #888; font-size: 13px; font-weight: bold; padding: 16px 12px; text-align: left; border-bottom: 2px solid #f3e5d0; text-transform: uppercase; }}
-            table.table-custom td {{ padding: 16px 12px; border-bottom: 1px solid #f3e5d0; color: #444; font-size: 14px; }}
+            table.table-custom th {{ background-color: transparent; color: #734D2E; font-size: 13px; font-weight: 600; padding: 16px 12px; text-align: left; border-bottom: 2px solid #EEDCCE; text-transform: uppercase; }}
+            table.table-custom td {{ padding: 16px 12px; border-bottom: 1px solid #F5EBE0; color: #4A3B32; font-size: 14px; }}
             
-            .modal {{ display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); overflow-y: auto; padding: 40px 0; }}
-            .modal-content {{ background-color: #fffdf9; margin: auto; padding: 30px; border: 2px solid #f3e5d0; width: 450px; max-width: 90%; border-radius: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); position: relative; box-sizing: border-box; }}
-            .close-btn {{ position: absolute; right: 20px; top: 20px; font-size: 22px; cursor: pointer; color: #888; font-weight: bold; }}
+            .modal {{ display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(74,59,50,0.4); overflow-y: auto; padding: 40px 0; }}
+            .modal-content {{ background-color: #FFFFFF; margin: auto; padding: 30px; border: 1px solid #EEDCCE; width: 450px; max-width: 90%; border-radius: 14px; box-shadow: 0 8px 24px rgba(74,59,50,0.1); position: relative; box-sizing: border-box; }}
+            .close-btn {{ position: absolute; right: 20px; top: 20px; font-size: 20px; cursor: pointer; color: #8C7A6B; font-weight: bold; background: #F5EBE0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid #EEDCCE; }}
             .form-group {{ margin-bottom: 18px; }}
-            .form-group label {{ display: block; font-weight: bold; color: #222; margin-bottom: 6px; font-size: 13px; }}
-            .form-control {{ width: 100%; padding: 12px; border: 2px solid #f3e5d0; border-radius: 8px; background: #fff; font-size: 14px; box-sizing: border-box; outline: none; }}
-            .modal-footer {{ display: flex; justify-content: flex-end; gap: 12px; border-top: 2px solid #f3e5d0; padding-top: 20px; margin-top: 20px; flex-wrap: wrap; }}
-            .btn-secondary {{ background: #fff; border: 2px solid #f3e5d0; color: #444; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }}
+            .form-group label {{ display: block; font-weight: 600; color: #734D2E; margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }}
+            .form-control {{ width: 100%; padding: 12px; border: 1px solid #EEDCCE; border-radius: 8px; background: #FAF8F5; font-size: 14px; box-sizing: border-box; outline: none; color: #4A3B32; }}
+            .form-control:focus {{ border-color: #D99B6A; background: #FFFFFF; }}
+            .modal-footer {{ display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #EEDCCE; padding-top: 20px; margin-top: 20px; flex-wrap: wrap; }}
+            .btn-secondary {{ background: #F5EBE0; border: 1px solid #EEDCCE; color: #4A3B32; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }}
             
-            .back-link {{ display: inline-block; margin-bottom: 15px; color: #b85d19; text-decoration: none; font-weight: bold; font-size: 14px; }}
+            .back-link {{ display: inline-block; margin-bottom: 15px; color: #D99B6A; text-decoration: none; font-weight: 600; font-size: 14px; }}
             .back-link:hover {{ text-decoration: underline; }}
 
-            /* Estilos Mobile-First / Responsivo para Telemóveis */
             @media screen and (max-width: 768px) {{
                 body {{ padding: 15px; }}
                 .cards-grid {{ grid-template-columns: 1fr; gap: 15px; }}
@@ -140,8 +143,8 @@ def gerir_mao_obra():
                     left: -9999px;
                 }}
                 table.table-custom tr {{
-                    background: #fff;
-                    border: 2px solid #f3e5d0;
+                    background: #FFFFFF;
+                    border: 1px solid #EEDCCE;
                     border-radius: 12px;
                     margin-bottom: 15px;
                     padding: 15px;
@@ -161,8 +164,8 @@ def gerir_mao_obra():
                     padding-right: 10px;
                     white-space: nowrap;
                     text-align: left;
-                    font-weight: bold;
-                    color: #888;
+                    font-weight: 600;
+                    color: #734D2E;
                     content: attr(data-label);
                 }}
             }}
@@ -175,7 +178,7 @@ def gerir_mao_obra():
             <div class="header-bar">
                 <div class="header-left">
                     <h1>Mão de Obra</h1>
-                    <p>Gerencie tarefas e tempos de produção</p>
+                    <p>Gerencie tarefas, sub-tarefas e tempos de produção</p>
                 </div>
                 <div class="header-actions">
                     <button class="btn-secondary-top" onclick="abrirModalValorHora()">⚙️ Valor/Hora</button>
@@ -198,7 +201,7 @@ def gerir_mao_obra():
                 </div>
             </div>
 
-            <div class="section-title">Lista de Tarefas</div>
+            <div class="section-title">Lista de Tarefas e Sub-tarefas</div>
             <div class="content-box">
                 <table class="table-custom">
                     <thead>
@@ -219,14 +222,14 @@ def gerir_mao_obra():
         <div id="modalTarefa" class="modal">
             <div class="modal-content">
                 <span class="close-btn" onclick="fecharModal()">&times;</span>
-                <h2 id="tituloModalTarefa" style="margin-top:0; color:#111; font-size:20px;">Adicionar Tarefa</h2>
+                <h2 id="tituloModalTarefa" style="margin-top:0; color:#2C1E1A; font-size:20px;">Adicionar Tarefa</h2>
                 
                 <form action="/maodeobra/salvar" method="POST">
                     <input type="hidden" name="id" id="tarefaId">
                     
                     <div class="form-group">
-                        <label>Nome da Tarefa *</label>
-                        <input type="text" name="tarefa" id="tarefaNome" class="form-control" placeholder="Ex: Amanteigada de Baunilha" required>
+                        <label>Nome da Tarefa / Sub-tarefa *</label>
+                        <input type="text" name="tarefa" id="tarefaNome" class="form-control" placeholder="Ex: Bater massa, Decorar, Cozer" required>
                     </div>
 
                     <div class="form-group">
@@ -245,7 +248,7 @@ def gerir_mao_obra():
         <div id="modalValorHora" class="modal">
             <div class="modal-content">
                 <span class="close-btn" onclick="fecharModalValorHora()">&times;</span>
-                <h2 style="margin-top:0; color:#111; font-size:20px;">Definir Valor por Hora</h2>
+                <h2 style="margin-top:0; color:#2C1E1A; font-size:20px;">Definir Valor por Hora</h2>
                 
                 <form action="/maodeobra/valor_hora" method="POST">
                     <div class="form-group">
