@@ -178,7 +178,7 @@ HTML_TEMPLATE = """
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" oninput="recalcularCustoTotal()" style="flex: 1;" required>
-                    <input type="text" name="unidade[]" class="form-control" placeholder="Ex: Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
+                    <input type="text" name="unidade[]" class="form-control" placeholder="Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
                     <button type="button" onclick="this.closest('.ingrediente-row').remove(); recalcularCustoTotal();" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
                 </div>
             `;
@@ -226,7 +226,7 @@ HTML_TEMPLATE = """
 <div id="modalReceita" class="modal">
     <div class="modal-content">
         <span class="close-btn" onclick="fecharModalReceita()">&times;</span>
-        <h2 style="margin-top:0; color:#2C1E1A; font-size:20px;">Criar Receita</h2>
+        <h2 style="margin-top:0; color:#2C1E1A; font-size:20px;">Receitas</h2>
         
         <form action="{{ url_for('receitas_bp.adicionar_receita') }}" method="POST">
             <div class="form-group">
@@ -246,6 +246,16 @@ HTML_TEMPLATE = """
                 <label>Descrição / Resumo</label>
                 <input type="text" name="descricao" class="form-control" placeholder="Breve descrição...">
             </div>
+
+            <div class="form-group">
+                <label>Passo a passo de como preparar a receita...</label>
+                <textarea name="preparacao" class="form-control" rows="3" placeholder="Passo a passo..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Notas Adicionais (opcional)</label>
+                <textarea name="notas" class="form-control" rows="2" placeholder="Dicas, variações, observações..."></textarea>
+            </div>
             
             <div class="form-group">
                 <label>Tempo de Produção (minutos)</label>
@@ -258,15 +268,6 @@ HTML_TEMPLATE = """
                     <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline" style="padding: 4px 10px; font-size: 12px;">+ Adicionar</button>
                 </label>
                 <div id="ingredientesContainer" style="margin-top: 8px;"></div>
-            </div>
-
-            <div class="form-group">
-                <label>Modo de Preparação</label>
-                <textarea name="preparacao" class="form-control" rows="3" placeholder="Passo a passo de como preparar a receita..."></textarea>
-            </div>
-            <div class="form-group">
-                <label>Notas Adicionais (opcional)</label>
-                <textarea name="notas" class="form-control" rows="2" placeholder="Dicas, variações, observações..."></textarea>
             </div>
 
             <div style="background: #F5EBE0; border: 1px solid #EEDCCE; border-radius: 10px; padding: 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -339,7 +340,7 @@ EDITAR_TEMPLATE = """
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" step="any" name="quantidade[]" class="form-control" placeholder="0" value="${qtdVal}" style="flex: 1;" required>
-                    <input type="text" name="unidade[]" class="form-control" placeholder="Ex: Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
+                    <input type="text" name="unidade[]" class="form-control" placeholder="Gramas (g), ml..." value="${unidadeVal}" style="flex: 1.2;" required>
                     <button type="button" onclick="this.closest('.ingrediente-row').remove()" style="background: none; border: none; color: #C0392B; font-size: 18px; cursor: pointer;" title="Remover">🗑️</button>
                 </div>
             `;
@@ -375,6 +376,16 @@ EDITAR_TEMPLATE = """
                 <label>Descrição / Resumo</label>
                 <input type="text" name="descricao" class="form-control" value="{{ receita.descricao or '' }}">
             </div>
+
+            <div class="form-group">
+                <label>Passo a passo de como preparar a receita...</label>
+                <textarea name="preparacao" class="form-control" rows="4">{{ receita.preparacao or '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Notas Adicionais</label>
+                <textarea name="notas" class="form-control" rows="2">{{ receita.notas or '' }}</textarea>
+            </div>
             
             <div class="form-group">
                 <label>Tempo de Produção (minutos)</label>
@@ -387,15 +398,6 @@ EDITAR_TEMPLATE = """
                     <button type="button" onclick="adicionarLinhaIngrediente('ingredientesContainer')" class="btn-outline">+ Adicionar</button>
                 </label>
                 <div id="ingredientesContainer" style="margin-top: 8px;"></div>
-            </div>
-
-            <div class="form-group">
-                <label>Modo de Preparação</label>
-                <textarea name="preparacao" class="form-control" rows="4">{{ receita.preparacao or '' }}</textarea>
-            </div>
-            <div class="form-group">
-                <label>Notas Adicionais</label>
-                <textarea name="notas" class="form-control" rows="2">{{ receita.notas or '' }}</textarea>
             </div>
 
             <div class="footer-actions">
